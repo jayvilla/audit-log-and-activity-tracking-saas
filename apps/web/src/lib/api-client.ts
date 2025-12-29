@@ -181,3 +181,67 @@ export async function getAuditEvents(
   return response.json();
 }
 
+/**
+ * Export audit events as JSON
+ */
+export async function exportAuditEventsAsJson(
+  params: GetAuditEventsParams = {},
+): Promise<AuditEvent[]> {
+  const queryParams = new URLSearchParams();
+  
+  if (params.startDate) queryParams.append('startDate', params.startDate);
+  if (params.endDate) queryParams.append('endDate', params.endDate);
+  if (params.action) queryParams.append('action', params.action);
+  if (params.actorType) queryParams.append('actorType', params.actorType);
+  if (params.resourceType) queryParams.append('resourceType', params.resourceType);
+  if (params.resourceId) queryParams.append('resourceId', params.resourceId);
+  if (params.metadataText) queryParams.append('metadataText', params.metadataText);
+
+  const response = await fetch(`${API_URL}/v1/audit-events/export.json?${queryParams.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('Forbidden: Admin role required');
+    }
+    throw new Error('Failed to export audit events');
+  }
+
+  return response.json();
+}
+
+/**
+ * Export audit events as CSV (returns blob)
+ */
+export async function exportAuditEventsAsCsv(
+  params: GetAuditEventsParams = {},
+): Promise<Blob> {
+  const queryParams = new URLSearchParams();
+  
+  if (params.startDate) queryParams.append('startDate', params.startDate);
+  if (params.endDate) queryParams.append('endDate', params.endDate);
+  if (params.action) queryParams.append('action', params.action);
+  if (params.actorType) queryParams.append('actorType', params.actorType);
+  if (params.resourceType) queryParams.append('resourceType', params.resourceType);
+  if (params.resourceId) queryParams.append('resourceId', params.resourceId);
+  if (params.metadataText) queryParams.append('metadataText', params.metadataText);
+
+  const response = await fetch(`${API_URL}/v1/audit-events/export.csv?${queryParams.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('Forbidden: Admin role required');
+    }
+    throw new Error('Failed to export audit events');
+  }
+
+  return response.blob();
+}
+
