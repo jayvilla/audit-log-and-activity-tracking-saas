@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, MoreThanOrEqual, LessThanOrEqual, ILike } from 'typeorm';
 import { AuditEventEntity, ActorType } from '../../entities/audit-event.entity';
 import type { CreateAuditEventRequest } from '@cursor-rules-monorepo/types';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
 import { Readable } from 'stream';
+import { WebhooksService } from '../webhooks/webhooks.service';
 
 interface Cursor {
   createdAt: string;
@@ -16,6 +17,8 @@ export class AuditEventsService {
   constructor(
     @InjectRepository(AuditEventEntity)
     private readonly auditEventRepository: Repository<AuditEventEntity>,
+    @Inject(forwardRef(() => WebhooksService))
+    private readonly webhooksService: WebhooksService,
   ) {}
 
   async createAuditEvent(
@@ -44,6 +47,33 @@ export class AuditEventsService {
     });
 
     const saved = await this.auditEventRepository.save(auditEvent);
+
+    // Enqueue webhook deliveries for matching webhooks (async, don't wait)
+    // Event type format: resourceType.action (e.g., "user.created", "api-key.deleted")
+    const eventType = `${saved.resourceType}.${saved.action}`;
+    const webhookPayload = {
+      event: eventType,
+      timestamp: saved.createdAt.toISOString(),
+      data: {
+        id: saved.id,
+        orgId: saved.orgId,
+        actorType: saved.actorType,
+        actorId: saved.actorId,
+        action: saved.action,
+        resourceType: saved.resourceType,
+        resourceId: saved.resourceId,
+        metadata: saved.metadata,
+        ipAddress: saved.ipAddress,
+        userAgent: saved.userAgent,
+        createdAt: saved.createdAt.toISOString(),
+      },
+    };
+
+    // Enqueue webhook deliveries (fire and forget)
+    this.webhooksService.enqueueWebhookDeliveries(orgId, eventType, webhookPayload).catch((error) => {
+      // Log error but don't fail audit event creation
+      console.error('Failed to enqueue webhook deliveries:', error);
+    });
 
     return {
       id: saved.id,

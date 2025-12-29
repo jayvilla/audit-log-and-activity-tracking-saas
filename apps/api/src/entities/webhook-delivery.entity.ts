@@ -42,5 +42,11 @@ export class WebhookDeliveryEntity extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   error: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  attempts: number;
+
+  @Column({ name: 'next_retry_at', type: 'timestamp', nullable: true })
+  nextRetryAt: Date | null;
 }
 

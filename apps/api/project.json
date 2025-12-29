@@ -93,6 +93,13 @@
         "command": "pnpm exec tsx apps/api/src/seed-simple.ts",
         "cwd": "{workspaceRoot}"
       }
+    },
+    "webhook-worker": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsx apps/api/src/webhook-worker.ts",
+        "cwd": "{workspaceRoot}"
+      }
     }
   },
   "tags": ["type:app", "scope:api"],

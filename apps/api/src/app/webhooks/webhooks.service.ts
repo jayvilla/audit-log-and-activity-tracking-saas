@@ -204,7 +204,49 @@ export class WebhooksService {
   }
 
   /**
+   * Enqueue webhook delivery for matching webhooks (creates delivery records without sending)
+   */
+  async enqueueWebhookDeliveries(
+    orgId: string,
+    eventType: string,
+    payload: Record<string, any>,
+  ): Promise<void> {
+    // Find all active webhooks for this org that subscribe to this event type
+    const webhooks = await this.webhookRepository.find({
+      where: {
+        orgId,
+        status: 'active',
+      },
+    });
+
+    const payloadString = JSON.stringify(payload);
+
+    // Create delivery records for matching webhooks
+    const deliveries = webhooks
+      .filter((webhook) => {
+        // Check if webhook subscribes to this event type
+        // If events is null/empty, subscribe to all events
+        return !webhook.events || webhook.events.length === 0 || webhook.events.includes(eventType);
+      })
+      .map((webhook) =>
+        this.webhookDeliveryRepository.create({
+          webhookId: webhook.id,
+          payload: payloadString,
+          status: 'pending',
+          attempts: 0,
+          attemptedAt: new Date(),
+          nextRetryAt: new Date(), // Ready to process immediately
+        }),
+      );
+
+    if (deliveries.length > 0) {
+      await this.webhookDeliveryRepository.save(deliveries);
+    }
+  }
+
+  /**
    * Send webhook payload (used by audit events or other triggers)
+   * NOTE: This method is kept for backward compatibility but enqueueWebhookDeliveries should be used instead
    */
   async sendWebhook(
     webhook: WebhookEntity,
