@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { AuditEventsModule } from './audit-events/audit-events.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { CsrfGuard } from './auth/csrf.guard';
 import {
   OrganizationEntity,
@@ -53,6 +54,7 @@ import {
     AuthModule,
     ApiKeyModule,
     AuditEventsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [
