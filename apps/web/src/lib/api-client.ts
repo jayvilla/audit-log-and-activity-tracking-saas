@@ -117,3 +117,67 @@ export async function logout(): Promise<void> {
   });
 }
 
+export interface GetAuditEventsParams {
+  cursor?: string;
+  startDate?: string;
+  endDate?: string;
+  action?: string;
+  actorType?: 'user' | 'api-key' | 'system';
+  resourceType?: string;
+  resourceId?: string;
+  metadataText?: string;
+  limit?: number;
+}
+
+export interface AuditEvent {
+  id: string;
+  orgId: string;
+  actorType: string;
+  actorId: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  metadata: Record<string, any> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface GetAuditEventsResponse {
+  data: AuditEvent[];
+  pageInfo: {
+    nextCursor: string | null;
+  };
+}
+
+/**
+ * Get audit events with filters and pagination
+ */
+export async function getAuditEvents(
+  params: GetAuditEventsParams = {},
+): Promise<GetAuditEventsResponse> {
+  const queryParams = new URLSearchParams();
+  
+  if (params.cursor) queryParams.append('cursor', params.cursor);
+  if (params.startDate) queryParams.append('startDate', params.startDate);
+  if (params.endDate) queryParams.append('endDate', params.endDate);
+  if (params.action) queryParams.append('action', params.action);
+  if (params.actorType) queryParams.append('actorType', params.actorType);
+  if (params.resourceType) queryParams.append('resourceType', params.resourceType);
+  if (params.resourceId) queryParams.append('resourceId', params.resourceId);
+  if (params.metadataText) queryParams.append('metadataText', params.metadataText);
+  if (params.limit) queryParams.append('limit', params.limit.toString());
+
+  const response = await fetch(`${API_URL}/v1/audit-events?${queryParams.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch audit events');
+  }
+
+  return response.json();
+}
+
