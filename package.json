@@ -75,6 +75,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.2.3",
     "@nestjs/typeorm": "^11.0.0",
+    "@tanstack/react-virtual": "^3.13.13",
     "axios": "^1.6.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",

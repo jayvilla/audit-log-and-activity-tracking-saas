@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { getMe, getAuditEvents, exportAuditEventsAsJson, exportAuditEventsAsCsv, type AuditEvent, type GetAuditEventsParams } from '../../lib/api-client';
 
 interface User {
@@ -24,6 +25,7 @@ export default function AuditLogsPage() {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const isInitialLoad = useRef(true);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [filters, setFilters] = useState<GetAuditEventsParams>({
@@ -159,6 +161,34 @@ export default function AuditLogsPage() {
   function getRoleBadgeColor(role: string) {
     return role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
   }
+
+  // Create a flat list of items for virtualization (includes both rows and expanded rows)
+  const virtualItems = useMemo(() => {
+    const items: Array<{ type: 'row' | 'expanded'; event: AuditEvent; index: number }> = [];
+    events.forEach((event, index) => {
+      items.push({ type: 'row', event, index });
+      if (expandedRows.has(event.id)) {
+        items.push({ type: 'expanded', event, index });
+      }
+    });
+    return items;
+  }, [events, expandedRows]);
+
+  // Virtualizer setup
+  const rowVirtualizer = useVirtualizer({
+    count: virtualItems.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: (index) => {
+      const item = virtualItems[index];
+      return item?.type === 'expanded' ? 300 : 60; // Expanded rows are taller
+    },
+    overscan: 5,
+    // Recalculate when expanded rows change
+    keyExtractor: (index) => {
+      const item = virtualItems[index];
+      return item ? `${item.event.id}-${item.type}` : index.toString();
+    },
+  });
 
   function isAdminOrAuditor(role: string): boolean {
     return role === 'admin'; // API only supports admin, not auditor
@@ -448,118 +478,157 @@ export default function AuditLogsPage() {
 
         {/* Results Table */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Timestamp
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Actor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Resource
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    IP Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Details
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {events.length === 0 ? (
+          {events.length === 0 ? (
+            <div className="px-6 py-8 text-center text-slate-500">
+              No audit events found
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                      No audit events found
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Timestamp
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Actor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Action
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Resource
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      IP Address
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Details
+                    </th>
                   </tr>
-                ) : (
-                  events.map((event) => (
-                    <>
-                      <tr
-                        key={event.id}
-                        className="hover:bg-slate-50 cursor-pointer transition-colors"
-                        onClick={() => toggleRow(event.id)}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                          {formatDate(event.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                          <div>
-                            <span className="font-medium">{event.actorType}</span>
-                            {event.actorId && (
-                              <div className="text-xs text-slate-500 truncate max-w-xs">
-                                {event.actorId}
+                </thead>
+              </table>
+              <div
+                ref={tableContainerRef}
+                className="overflow-auto"
+                style={{ height: '600px' }}
+              >
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  <table className="w-full">
+                    <tbody>
+                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const item = virtualItems[virtualRow.index];
+                        if (!item) return null;
+
+                        if (item.type === 'expanded') {
+                          return (
+                            <tr
+                              key={`${item.event.id}-expanded`}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: `${virtualRow.size}px`,
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                              className="bg-slate-50 border-t border-slate-200"
+                            >
+                              <td colSpan={6} className="px-6 py-4">
+                                <div className="space-y-4">
+                                  {item.event.metadata && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-slate-900 mb-2">Metadata</h4>
+                                      <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs">
+                                        {JSON.stringify(item.event.metadata, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                  {item.event.userAgent && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-slate-900 mb-1">User Agent</h4>
+                                      <p className="text-sm text-slate-600">{item.event.userAgent}</p>
+                                    </div>
+                                  )}
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="font-semibold text-slate-700">Event ID:</span>
+                                      <span className="ml-2 text-slate-600 font-mono text-xs">{item.event.id}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-slate-700">Organization ID:</span>
+                                      <span className="ml-2 text-slate-600 font-mono text-xs">{item.event.orgId}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr
+                            key={item.event.id}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: `${virtualRow.size}px`,
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                            className="hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-200"
+                            onClick={() => toggleRow(item.event.id)}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                              {formatDate(item.event.createdAt)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                              <div>
+                                <span className="font-medium">{item.event.actorType}</span>
+                                {item.event.actorId && (
+                                  <div className="text-xs text-slate-500 truncate max-w-xs">
+                                    {item.event.actorId}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                            {event.action}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                          <div>
-                            <span className="font-medium">{event.resourceType}</span>
-                            <div className="text-xs text-slate-500 truncate max-w-xs">
-                              {event.resourceId}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {event.ipAddress || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          <button className="text-blue-600 hover:text-blue-800 font-medium">
-                            {expandedRows.has(event.id) ? 'Hide' : 'Show'} Details
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedRows.has(event.id) && (
-                        <tr key={`${event.id}-expanded`} className="bg-slate-50">
-                          <td colSpan={6} className="px-6 py-4">
-                            <div className="space-y-4">
-                              {event.metadata && (
-                                <div>
-                                  <h4 className="text-sm font-semibold text-slate-900 mb-2">Metadata</h4>
-                                  <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs">
-                                    {JSON.stringify(event.metadata, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                              {event.userAgent && (
-                                <div>
-                                  <h4 className="text-sm font-semibold text-slate-900 mb-1">User Agent</h4>
-                                  <p className="text-sm text-slate-600">{event.userAgent}</p>
-                                </div>
-                              )}
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="font-semibold text-slate-700">Event ID:</span>
-                                  <span className="ml-2 text-slate-600 font-mono text-xs">{event.id}</span>
-                                </div>
-                                <div>
-                                  <span className="font-semibold text-slate-700">Organization ID:</span>
-                                  <span className="ml-2 text-slate-600 font-mono text-xs">{event.orgId}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                {item.event.action}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                              <div>
+                                <span className="font-medium">{item.event.resourceType}</span>
+                                <div className="text-xs text-slate-500 truncate max-w-xs">
+                                  {item.event.resourceId}
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                              {item.event.ipAddress || '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                              <button className="text-blue-600 hover:text-blue-800 font-medium">
+                                {expandedRows.has(item.event.id) ? 'Hide' : 'Show'} Details
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Load More Button */}
           {nextCursor && (
