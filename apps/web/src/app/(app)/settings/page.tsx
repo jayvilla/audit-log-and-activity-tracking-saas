@@ -35,10 +35,10 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div>
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-fg mb-2">Settings</h1>
-          <p className="text-muted">Loading...</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold text-fg">Settings</h1>
+          <p className="text-sm text-muted mt-1">Loading...</p>
         </div>
       </div>
     );
@@ -46,10 +46,10 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <div>
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-fg mb-2">Settings</h1>
-          <p className="text-muted">Unable to load user information</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold text-fg">Settings</h1>
+          <p className="text-sm text-muted mt-1">Unable to load user information</p>
         </div>
       </div>
     );
@@ -60,10 +60,10 @@ export default function SettingsPage() {
   const isViewer = user.role === 'viewer';
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-fg mb-2">Settings</h1>
-        <p className="text-muted">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-fg">Settings</h1>
+        <p className="text-sm text-muted mt-1">
           {isAdmin
             ? 'Manage your account and organization settings'
             : isMember
@@ -78,19 +78,25 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-fg mb-4">Account Information</h2>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-muted block mb-1">Email</label>
-              <p className="text-fg">{user.email}</p>
+              <label htmlFor="user-email" className="text-sm font-medium text-muted block mb-1">
+                Email
+              </label>
+              <p id="user-email" className="text-fg">{user.email}</p>
             </div>
             {user.name && (
               <div>
-                <label className="text-sm font-medium text-muted block mb-1">Name</label>
-                <p className="text-fg">{user.name}</p>
+                <label htmlFor="user-name" className="text-sm font-medium text-muted block mb-1">
+                  Name
+                </label>
+                <p id="user-name" className="text-fg">{user.name}</p>
               </div>
             )}
             <div>
-              <label className="text-sm font-medium text-muted block mb-1">Role</label>
+              <label htmlFor="user-role" className="text-sm font-medium text-muted block mb-1">
+                Role
+              </label>
               <div className="mt-1">
-                <Badge variant="secondary" className="capitalize">
+                <Badge id="user-role" variant="secondary" className="capitalize">
                   {user.role}
                 </Badge>
               </div>

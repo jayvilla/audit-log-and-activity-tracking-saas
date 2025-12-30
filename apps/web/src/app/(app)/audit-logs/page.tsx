@@ -265,7 +265,7 @@ export default function AuditLogsPage() {
     <div className="space-y-6">
       {/* Header with Export */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-fg">Audit Logs</h1>
+        <h1 className="text-xl font-semibold text-fg" id="audit-logs-heading">Audit Logs</h1>
         {user && isAdminOrAuditor(user.role) && (
           <DropdownMenu
             align="right"
@@ -332,58 +332,66 @@ export default function AuditLogsPage() {
       )}
 
       {/* Filters */}
-      <div className="border border-border rounded-lg p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-fg">Filters</h2>
+      <div className="border border-border rounded-lg p-6 space-y-4" role="region" aria-labelledby="filters-heading">
+        <h2 id="filters-heading" className="text-sm font-semibold text-fg">Filters</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Date Range */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-start-date" className="block text-xs font-medium text-muted">
               Start Date
             </label>
             <Input
+              id="filter-start-date"
               type="datetime-local"
               value={filters.startDate ? new Date(filters.startDate).toISOString().slice(0, 16) : ''}
               onChange={(e) => {
                 const value = e.target.value;
                 handleFilterChange('startDate', value ? new Date(value).toISOString() : undefined);
               }}
+              aria-label="Filter by start date"
             />
           </div>
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-end-date" className="block text-xs font-medium text-muted">
               End Date
             </label>
             <Input
+              id="filter-end-date"
               type="datetime-local"
               value={filters.endDate ? new Date(filters.endDate).toISOString().slice(0, 16) : ''}
               onChange={(e) => {
                 const value = e.target.value;
                 handleFilterChange('endDate', value ? new Date(value).toISOString() : undefined);
               }}
+              aria-label="Filter by end date"
             />
           </div>
 
           {/* Action */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-action" className="block text-xs font-medium text-muted">
               Action
             </label>
             <Input
+              id="filter-action"
               type="text"
               value={filters.action || ''}
               onChange={(e) => handleFilterChange('action', e.target.value)}
               placeholder="e.g., created, updated"
+              aria-label="Filter by action"
             />
           </div>
 
           {/* Actor Type */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-actor-type" className="block text-xs font-medium text-muted">
               Actor Type
             </label>
             <Select
+              id="filter-actor-type"
               value={filters.actorType || ''}
               onChange={(e) => handleFilterChange('actorType', e.target.value)}
+              aria-label="Filter by actor type"
             >
               <option value="">All</option>
               <option value="user">User</option>
@@ -394,54 +402,61 @@ export default function AuditLogsPage() {
 
           {/* Resource Type */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-resource-type" className="block text-xs font-medium text-muted">
               Resource Type
             </label>
             <Input
+              id="filter-resource-type"
               type="text"
               value={filters.resourceType || ''}
               onChange={(e) => handleFilterChange('resourceType', e.target.value)}
               placeholder="e.g., user, api-key"
+              aria-label="Filter by resource type"
             />
           </div>
 
           {/* Resource ID */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-resource-id" className="block text-xs font-medium text-muted">
               Resource ID
             </label>
             <Input
+              id="filter-resource-id"
               type="text"
               value={filters.resourceId || ''}
               onChange={(e) => handleFilterChange('resourceId', e.target.value)}
               placeholder="UUID"
+              aria-label="Filter by resource ID"
             />
           </div>
 
           {/* Metadata Text */}
           <div className="md:col-span-2 lg:col-span-3 space-y-2">
-            <label className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-metadata" className="block text-xs font-medium text-muted">
               Metadata Search
             </label>
             <Input
+              id="filter-metadata"
               type="text"
               value={filters.metadataText || ''}
               onChange={(e) => handleFilterChange('metadataText', e.target.value)}
               placeholder="Search in metadata JSON"
+              aria-label="Search in metadata"
             />
           </div>
         </div>
       </div>
 
       {/* Results Table */}
-      <div className="border border-border rounded-lg overflow-hidden">
+      <div className="border border-border rounded-lg overflow-hidden" role="region" aria-labelledby="audit-logs-heading">
         {events.length === 0 && !isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16 px-6">
+          <div className="flex flex-col items-center justify-center py-16 px-6" role="status" aria-live="polite">
             <svg
               className="w-12 h-12 text-muted mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -456,30 +471,29 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table role="table" aria-label="Audit events">
                 <TableHeader>
                   <TableRow hover={false}>
-                    <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider">
+                    <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                       Timestamp
                     </TableHead>
-                    <TableHead className="min-w-[200px] text-xs font-semibold text-muted uppercase tracking-wider">
+                    <TableHead className="min-w-[200px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                       Actor
                     </TableHead>
-                    <TableHead className="min-w-[120px] text-xs font-semibold text-muted uppercase tracking-wider">
+                    <TableHead className="min-w-[120px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                       Action
                     </TableHead>
-                    <TableHead className="min-w-[250px] text-xs font-semibold text-muted uppercase tracking-wider">
+                    <TableHead className="min-w-[250px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                       Resource
                     </TableHead>
-                    <TableHead className="min-w-[140px] text-xs font-semibold text-muted uppercase tracking-wider">
+                    <TableHead className="min-w-[140px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                       IP Address
                     </TableHead>
-                    <TableHead className="min-w-[120px] text-xs font-semibold text-muted uppercase tracking-wider">
+                    <TableHead className="min-w-[120px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                       Details
                     </TableHead>
                   </TableRow>
                 </TableHeader>
-              </Table>
               <div
                 ref={tableContainerRef}
                 className="overflow-auto"
@@ -559,6 +573,15 @@ export default function AuditLogsPage() {
                             }}
                             className="cursor-pointer"
                             onClick={() => toggleRow(item.event.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggleRow(item.event.id);
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`${expandedRows.has(item.event.id) ? 'Collapse' : 'Expand'} event ${item.event.id}`}
                           >
                             <TableCell className="min-w-[180px] text-sm text-fg">
                               {formatDate(item.event.createdAt)}
@@ -590,7 +613,11 @@ export default function AuditLogsPage() {
                               {item.event.ipAddress || '-'}
                             </TableCell>
                             <TableCell className="min-w-[120px]">
-                              <button className="text-xs font-medium text-accent hover:text-accent-2 transition-colors">
+                              <button
+                                className="text-xs font-medium text-accent hover:text-accent-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded px-2 py-1"
+                                aria-expanded={expandedRows.has(item.event.id)}
+                                aria-label={expandedRows.has(item.event.id) ? 'Hide event details' : 'Show event details'}
+                              >
                                 {expandedRows.has(item.event.id) ? 'Hide' : 'Show'} Details
                               </button>
                             </TableCell>

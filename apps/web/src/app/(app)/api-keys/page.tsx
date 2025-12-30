@@ -120,10 +120,12 @@ export default function ApiKeysPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-fg mb-2">API Keys</h1>
-            <p className="text-muted">Manage your API keys for programmatic access</p>
+            <h1 className="text-xl font-semibold text-fg">API Keys</h1>
+            <p className="text-sm text-muted mt-1">Manage your API keys for programmatic access</p>
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>Create API Key</Button>
+          <Button onClick={() => setIsCreateModalOpen(true)} aria-label="Create new API key">
+            Create API Key
+          </Button>
         </div>
       </div>
 
@@ -135,33 +137,37 @@ export default function ApiKeysPage() {
 
       <div className="bg-card rounded-lg border border-border overflow-hidden flex-1 flex flex-col">
         {isLoading ? (
-          <div className="p-8 text-center text-muted">Loading API keys...</div>
+          <div className="p-8 text-center text-muted" role="status" aria-live="polite">
+            Loading API keys...
+          </div>
         ) : apiKeys.length === 0 ? (
-          <div className="p-8 text-center text-muted">
+          <div className="p-8 text-center text-muted" role="status" aria-live="polite">
             <p className="mb-4">No API keys found</p>
-            <Button onClick={() => setIsCreateModalOpen(true)}>Create your first API key</Button>
+            <Button onClick={() => setIsCreateModalOpen(true)} aria-label="Create your first API key">
+              Create your first API key
+            </Button>
           </div>
         ) : (
           <div className="overflow-auto flex-1">
-            <Table>
+            <Table role="table" aria-label="API keys">
               <TableHeader>
                 <TableRow hover={false}>
-                  <TableHead className="min-w-[200px] text-xs font-semibold text-muted uppercase tracking-wider">
+                  <TableHead className="min-w-[200px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                     Name
                   </TableHead>
-                  <TableHead className="min-w-[150px] text-xs font-semibold text-muted uppercase tracking-wider">
+                  <TableHead className="min-w-[150px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                     Prefix
                   </TableHead>
-                  <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider">
+                  <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                     Created At
                   </TableHead>
-                  <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider">
+                  <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                     Last Used At
                   </TableHead>
-                  <TableHead className="min-w-[100px] text-xs font-semibold text-muted uppercase tracking-wider">
+                  <TableHead className="min-w-[100px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
                     Status
                   </TableHead>
-                  <TableHead className="min-w-[80px] text-xs font-semibold text-muted uppercase tracking-wider text-right">
+                  <TableHead className="min-w-[80px] text-xs font-semibold text-muted uppercase tracking-wider text-right" scope="col">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -187,12 +193,17 @@ export default function ApiKeysPage() {
                       <TableCell className="text-right">
                         <DropdownMenu
                           trigger={
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`Actions for API key ${key.name}`}
+                            >
                               <svg
                                 className="h-4 w-4"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
+                                aria-hidden="true"
                               >
                                 <path
                                   strokeLinecap="round"
@@ -250,6 +261,7 @@ export default function ApiKeysPage() {
                 <Button
                   variant="secondary"
                   onClick={() => handleCopyKey(newKeyData.key)}
+                  aria-label="Copy API key to clipboard"
                 >
                   Copy
                 </Button>
