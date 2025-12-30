@@ -28,6 +28,9 @@ export class ApiKeyEntity extends BaseEntity {
   @Column({ name: 'key_hash', type: 'varchar', length: 255, unique: true })
   keyHash: string;
 
+  @Column({ name: 'key_prefix', type: 'varchar', length: 16, nullable: true })
+  keyPrefix: string | null;
+
   @Column({ name: 'last_used_at', type: 'timestamp', nullable: true })
   lastUsedAt: Date | null;
 }

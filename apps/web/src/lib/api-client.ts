@@ -245,3 +245,94 @@ export async function exportAuditEventsAsCsv(
   return response.blob();
 }
 
+/**
+ * API Key types and functions
+ */
+export interface ApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface CreateApiKeyRequest {
+  name: string;
+  expiresInDays?: number;
+}
+
+export interface CreateApiKeyResponse {
+  id: string;
+  name: string;
+  key: string; // Full key shown only once
+  keyPrefix: string;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Get all API keys for the current organization
+ */
+export async function getApiKeys(): Promise<ApiKey[]> {
+  const response = await fetch(`${API_URL}/api-keys`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch API keys');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new API key
+ */
+export async function createApiKey(
+  request: CreateApiKeyRequest,
+): Promise<CreateApiKeyResponse> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/api-keys`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to create API key' }));
+    throw new Error(error.message || 'Failed to create API key');
+  }
+
+  return response.json();
+}
+
+/**
+ * Revoke (delete) an API key
+ */
+export async function revokeApiKey(id: string): Promise<void> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/api-keys/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to revoke API key' }));
+    throw new Error(error.message || 'Failed to revoke API key');
+  }
+}
+
