@@ -52,7 +52,9 @@ export async function createTestApp(): Promise<INestApplication> {
           ssl: false,
           // For tests, use a single connection to avoid connection pool isolation issues
           extra: {
-            max: 1, // Limit connection pool to 1 for tests
+            max: 1, // Limit connection pool to 1 for tests - ensures all queries use the same connection
+            min: 1, // Keep at least 1 connection open
+            idleTimeoutMillis: 0, // Don't close idle connections in tests
           },
         }),
         inject: [ConfigService],
@@ -120,19 +122,22 @@ export async function createTestApp(): Promise<INestApplication> {
 
   await app.init();
   
-  // Export the app's DataSource and UserRepository for test helpers to use
-  // Get DataSource from TypeORM module using the default connection token
+  // Export the app's DataSource and repositories for test helpers to use
+  // This ensures test helpers use the exact same DataSource and repository instances as the app services
   try {
     const dataSource = app.get<DataSource>(getDataSourceToken());
     (global as any).__TEST_APP_DATA_SOURCE__ = dataSource;
     
-    // Get the UserRepository using the same token that AuthService uses
+    // Get all repositories using the same tokens that services use
+    // This ensures we're using the exact same repository instances
     try {
-      const userRepo = app.get<Repository<UserEntity>>(getRepositoryToken(UserEntity));
-      (global as any).__TEST_APP_USER_REPO__ = userRepo;
-      console.log('✅ Test app DataSource and UserRepository set for test helpers');
+      (global as any).__TEST_APP_USER_REPO__ = app.get<Repository<UserEntity>>(getRepositoryToken(UserEntity));
+      (global as any).__TEST_APP_ORG_REPO__ = app.get<Repository<OrganizationEntity>>(getRepositoryToken(OrganizationEntity));
+      (global as any).__TEST_APP_API_KEY_REPO__ = app.get<Repository<ApiKeyEntity>>(getRepositoryToken(ApiKeyEntity));
+      (global as any).__TEST_APP_AUDIT_EVENT_REPO__ = app.get<Repository<AuditEventEntity>>(getRepositoryToken(AuditEventEntity));
+      console.log('✅ Test app DataSource and repositories set for test helpers');
     } catch (repoError) {
-      console.warn('⚠️  Could not get UserRepository, will use DataSource repository');
+      console.warn('⚠️  Could not get all repositories, will use DataSource repositories');
     }
   } catch (error) {
     // If DataSource injection fails, try getting it directly
