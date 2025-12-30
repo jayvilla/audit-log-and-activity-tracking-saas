@@ -109,6 +109,13 @@
         "cwd": "{workspaceRoot}"
       }
     },
+    "add-audit-events": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsx apps/api/src/add-audit-events.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
     "webhook-worker": {
       "executor": "nx:run-commands",
       "options": {

@@ -260,7 +260,7 @@ export default function AuditLogsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 max-w-[95vw]">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -484,25 +484,25 @@ export default function AuditLogsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1200px]">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[180px]">
                       Timestamp
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[200px]">
                       Actor
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">
                       Action
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[250px]">
                       Resource
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[140px]">
                       IP Address
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">
                       Details
                     </th>
                   </tr>
@@ -517,10 +517,11 @@ export default function AuditLogsPage() {
                   style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,
                     width: '100%',
+                    minWidth: '1200px',
                     position: 'relative',
                   }}
                 >
-                  <table className="w-full">
+                  <table className="w-full min-w-[1200px]">
                     <tbody>
                       {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                         const item = virtualItems[virtualRow.index];
@@ -586,36 +587,36 @@ export default function AuditLogsPage() {
                             className="hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-200"
                             onClick={() => toggleRow(item.event.id)}
                           >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                            <td className="px-6 py-4 text-sm text-slate-900 min-w-[180px]">
                               {formatDate(item.event.createdAt)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                            <td className="px-6 py-4 text-sm text-slate-900 min-w-[200px]">
                               <div>
                                 <span className="font-medium">{item.event.actorType}</span>
                                 {item.event.actorId && (
-                                  <div className="text-xs text-slate-500 truncate max-w-xs">
+                                  <div className="text-xs text-slate-500 break-all font-mono">
                                     {item.event.actorId}
                                   </div>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                            <td className="px-6 py-4 text-sm text-slate-900 min-w-[120px]">
                               <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                                 {item.event.action}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                            <td className="px-6 py-4 text-sm text-slate-900 min-w-[250px]">
                               <div>
                                 <span className="font-medium">{item.event.resourceType}</span>
-                                <div className="text-xs text-slate-500 truncate max-w-xs">
+                                <div className="text-xs text-slate-500 break-all font-mono">
                                   {item.event.resourceId}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                            <td className="px-6 py-4 text-sm text-slate-500 min-w-[140px]">
                               {item.event.ipAddress || '-'}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                            <td className="px-6 py-4 text-sm text-slate-500 min-w-[120px]">
                               <button className="text-blue-600 hover:text-blue-800 font-medium">
                                 {expandedRows.has(item.event.id) ? 'Hide' : 'Show'} Details
                               </button>
