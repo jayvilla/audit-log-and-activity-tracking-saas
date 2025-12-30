@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getMe } from '../../../lib/api-client';
+import { usePageTitle } from '../../../lib/use-page-title';
 import {
   Card,
   CardContent,
@@ -20,6 +21,8 @@ interface User {
 }
 
 export default function SettingsPage() {
+  usePageTitle('Settings');
+  
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

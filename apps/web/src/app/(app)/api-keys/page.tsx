@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getApiKeys, createApiKey, revokeApiKey, type ApiKey, type CreateApiKeyRequest } from '../../../lib/api-client';
+import { usePageTitle } from '../../../lib/use-page-title';
 import {
   Card,
   CardContent,
@@ -21,6 +22,8 @@ import { DropdownMenu, DropdownMenuItem } from '../../../components/ui/dropdown-
 import { cn } from '../../../lib/utils';
 
 export default function ApiKeysPage() {
+  usePageTitle('API Keys');
+  
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

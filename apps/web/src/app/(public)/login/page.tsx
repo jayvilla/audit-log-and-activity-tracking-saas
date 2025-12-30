@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login, getMe } from '../../../lib/api-client';
+import { usePageTitle } from '../../../lib/use-page-title';
 import {
   Card,
   CardContent,
@@ -15,6 +16,8 @@ import {
 import { cn } from '../../../lib/utils';
 
 export default function LoginPage() {
+  usePageTitle('Sign In');
+  
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

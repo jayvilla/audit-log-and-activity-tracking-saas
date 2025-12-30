@@ -1,6 +1,10 @@
+'use client';
+
 import { Card } from '../../../components/ui/card';
+import { usePageTitle } from '../../../lib/use-page-title';
 
 export default function WebhooksPage() {
+  usePageTitle('Webhooks');
   return (
     <div className="space-y-6">
       <div>

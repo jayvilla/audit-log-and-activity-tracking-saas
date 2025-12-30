@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { getMe, getAuditEvents, exportAuditEventsAsJson, exportAuditEventsAsCsv, type AuditEvent, type GetAuditEventsParams } from '../../../lib/api-client';
+import { usePageTitle } from '../../../lib/use-page-title';
 import {
   Card,
   CardContent,
@@ -32,6 +33,8 @@ interface User {
 }
 
 export default function AuditLogsPage() {
+  usePageTitle('Audit Logs');
+  
   const [user, setUser] = useState<User | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);

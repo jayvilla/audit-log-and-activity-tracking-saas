@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePageTitle } from '../../lib/use-page-title';
 import {
   Button,
   Card,
@@ -24,6 +25,8 @@ import {
 } from '@audit-log-and-activity-tracking-saas/ui';
 
 export default function UIDemoPage() {
+  usePageTitle('UI Demo');
+  
   const [modalOpen, setModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [selectValue, setSelectValue] = useState('option1');
