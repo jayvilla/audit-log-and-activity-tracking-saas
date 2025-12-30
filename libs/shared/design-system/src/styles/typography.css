@@ -1,0 +1,33 @@
+@layer base {
+  * {
+    @apply border-[hsl(var(--border))];
+  }
+  
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    line-height: 1.5;
+    tab-size: 4;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-[hsl(var(--bg))] text-[hsl(var(--foreground))];
+    font-family: inherit;
+    line-height: inherit;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    position: relative;
+  }
+  
+  h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+}
+

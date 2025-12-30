@@ -1,0 +1,13 @@
+/**
+ * Design System - Main Entry Point
+ * 
+ * Import this single file to get all design system styles:
+ * - CSS variables (tokens)
+ * - Typography defaults
+ * - Background effects
+ */
+
+@import './tokens.css';
+@import './typography.css';
+@import './background.css';
+

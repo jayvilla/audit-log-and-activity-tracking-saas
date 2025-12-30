@@ -1,0 +1,22 @@
+{
+  "name": "design-system",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/design-system/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/shared/design-system",
+        "main": "libs/shared/design-system/src/index.ts",
+        "tsConfig": "libs/shared/design-system/tsconfig.lib.json",
+        "assets": [
+          "libs/shared/design-system/*.md",
+          "libs/shared/design-system/src/styles/**/*.css"
+        ]
+      }
+    }
+  }
+}

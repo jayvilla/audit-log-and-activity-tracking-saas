@@ -15,7 +15,12 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@audit-log-and-activity-tracking-saas/types": ["libs/shared/types/src/index.ts"]
+      "@audit-log-and-activity-tracking-saas/types": [
+        "libs/shared/types/src/index.ts"
+      ],
+      "@audit-log-and-activity-tracking-saas/design-system": [
+        "libs/shared/design-system/src/index.ts"
+      ]
     }
   },
   "exclude": ["node_modules", "tmp"]
