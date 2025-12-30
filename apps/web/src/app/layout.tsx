@@ -3,8 +3,9 @@ import './globals.css';
 
 const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-sans',
   display: 'swap',
+  variable: '--font-inter',
+  preload: true,
 });
 
 export const metadata = {
@@ -19,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="antialiased">{children}</body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
