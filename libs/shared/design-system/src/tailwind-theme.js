@@ -65,5 +65,23 @@ module.exports = {
   fontFamily: {
     sans: ['var(--font-inter)', 'var(--font-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
   },
+  
+  borderRadius: {
+    // Minimal, Linear-style border radius
+    sm: '0.375rem',   // 6px - small elements
+    md: '0.5rem',     // 8px - buttons, inputs
+    lg: '0.75rem',    // 12px - cards, modals (default)
+    xl: '1rem',       // 16px - large cards
+    full: '9999px',   // full - badges, avatars
+  },
+  
+  boxShadow: {
+    // Minimal shadows - Linear-style
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    // Cards typically use no shadow (bordered variant) or minimal shadow
+    // Dropdowns and modals use shadow-lg
+  },
 };
 
