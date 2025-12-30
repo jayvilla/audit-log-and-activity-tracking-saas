@@ -4,9 +4,11 @@
   --foreground: 0 0% 98%;
   --muted: 240 3.7% 15.9%;
   --muted-foreground: 240 5% 64.9%;
+  --muted-2: 240 3.7% 15.9%; /* Slightly lighter muted variant */
   --border: 240 3.7% 15.9%;
   --card: 240 5.5% 8.5%;
   --card-foreground: 0 0% 98%;
+  --card-2: 240 5.5% 12.2%; /* Slightly lighter card variant */
   --accent: 240 4.8% 95.9%;
   --accent-foreground: 240 5.9% 10%;
   --accent2: 217 91% 60%;

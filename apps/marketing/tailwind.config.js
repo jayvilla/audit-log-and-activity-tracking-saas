@@ -9,6 +9,9 @@
 // If you are **not** using `--turbo` you can uncomment both lines 1 & 19.
 // A discussion of the issue can be found: https://github.com/nrwl/nx/issues/26510
 
+// Import shared token-based theme from design system
+const sharedTheme = require('../../libs/shared/design-system/src/tailwind-theme');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -21,7 +24,7 @@ module.exports = {
     //     ...createGlobPatternsForDependencies(__dirname)
   ],
   theme: {
-    extend: {},
+    extend: sharedTheme,
   },
   plugins: [],
 };
