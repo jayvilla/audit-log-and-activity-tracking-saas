@@ -2,7 +2,7 @@ import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, MoreThanOrEqual, LessThanOrEqual, ILike } from 'typeorm';
 import { AuditEventEntity, ActorType } from '../../entities/audit-event.entity';
-import type { CreateAuditEventRequest } from '@cursor-rules-monorepo/types';
+import type { CreateAuditEventRequest } from '@audit-log-and-activity-tracking-saas/types';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
 import { Readable } from 'stream';
 import { WebhooksService } from '../webhooks/webhooks.service';

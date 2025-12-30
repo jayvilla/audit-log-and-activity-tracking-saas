@@ -47,7 +47,7 @@ An MVP-focused audit logging platform with append-only logs, filtering, export c
 ## Repository Structure
 
 ```
-cursor-rules-monorepo/
+audit-log-and-activity-tracking-saas/
 ├── apps/
 │   ├── api/              # NestJS backend application
 │   │   ├── src/
@@ -164,7 +164,7 @@ If running the API independently, you can also create `apps/api/.env` with datab
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
-   cd cursor-rules-monorepo
+   cd audit-log-and-activity-tracking-saas
    ```
 
 2. **Install dependencies:**
@@ -350,12 +350,12 @@ pnpm nx run-many --target=build --all
 
 **Build API image:**
 ```bash
-docker build -f apps/api/Dockerfile -t cursor-rules-api:latest .
+docker build -f apps/api/Dockerfile -t audit-log-saas-api:latest .
 ```
 
 **Build Web image:**
 ```bash
-docker build -f apps/web/Dockerfile -t cursor-rules-web:latest \
+docker build -f apps/web/Dockerfile -t audit-log-saas-web:latest \
   --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000/api .
 ```
 
@@ -386,7 +386,7 @@ docker run -p 8000:8000 \
   -e SESSION_SECRET=your-secret \
   -e WEB_ORIGIN=https://your-frontend-domain.com \
   -e NODE_ENV=production \
-  cursor-rules-api:latest
+  audit-log-saas-api:latest
 ```
 
 Web:
@@ -394,7 +394,7 @@ Web:
 docker run -p 3000:3000 \
   -e NEXT_PUBLIC_API_URL=https://your-api-domain.com/api \
   -e NODE_ENV=production \
-  cursor-rules-web:latest
+  audit-log-saas-web:latest
 ```
 
 ---

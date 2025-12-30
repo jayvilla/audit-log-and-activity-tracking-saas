@@ -1,7 +1,7 @@
 import { IsString, IsObject, IsOptional, ValidateNested, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { CreateAuditEventRequest } from '@cursor-rules-monorepo/types';
+import type { CreateAuditEventRequest } from '@audit-log-and-activity-tracking-saas/types';
 
 class ActorDto {
   @ApiProperty({ enum: ['user', 'api-key', 'system'] })

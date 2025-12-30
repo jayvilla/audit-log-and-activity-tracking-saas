@@ -33,7 +33,7 @@ export const dataSourceOptions: DataSourceOptions = {
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   extra: {
     // Prevent issues with enum types in migrations
-    applicationName: 'cursor-rules-api',
+    applicationName: 'audit-log-saas-api',
   },
 };
 
