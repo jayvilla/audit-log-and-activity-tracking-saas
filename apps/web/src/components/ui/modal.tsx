@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
+import { modalBackdrop, modalContent, modalTransition, useReducedMotion } from '../../lib/motion';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -22,6 +24,7 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (isOpen) {
@@ -53,8 +56,6 @@ export const Modal: React.FC<ModalProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const sizeClasses = {
     sm: 'max-w-md',
     md: 'max-w-lg',
@@ -63,59 +64,73 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={title ? 'modal-title' : undefined}
-    >
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? 'modal-title' : undefined}
+        >
+          {/* Backdrop */}
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+            aria-hidden="true"
+            variants={prefersReducedMotion ? {} : modalBackdrop}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            transition={prefersReducedMotion ? { duration: 0 } : modalTransition}
+          />
 
-      {/* Modal */}
-      <div
-        ref={modalRef}
-        className={cn(
-          'relative z-50 w-full rounded-lg border border-border bg-card shadow-xl',
-          'focus:outline-none',
-          sizeClasses[size],
-          className
-        )}
-        tabIndex={-1}
-      >
-        {title && (
-          <div className="flex items-center justify-between border-b border-border px-6 py-4">
-            <h2 id="modal-title" className="text-lg font-semibold text-fg">
-              {title}
-            </h2>
-            <button
-              onClick={onClose}
-              className="rounded-md p-1 text-muted hover:bg-muted hover:text-fg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg"
-              aria-label="Close modal"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        )}
-        <div className="px-6 py-4">{children}</div>
-      </div>
-    </div>
+          {/* Modal */}
+          <motion.div
+            ref={modalRef}
+            className={cn(
+              'relative z-50 w-full rounded-lg border border-border bg-card shadow-xl',
+              'focus:outline-none',
+              sizeClasses[size],
+              className
+            )}
+            tabIndex={-1}
+            variants={prefersReducedMotion ? {} : modalContent}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            transition={prefersReducedMotion ? { duration: 0 } : modalTransition}
+          >
+            {title && (
+              <div className="flex items-center justify-between border-b border-border px-6 py-4">
+                <h2 id="modal-title" className="text-lg font-semibold text-fg">
+                  {title}
+                </h2>
+                <button
+                  onClick={onClose}
+                  className="rounded-md p-1 text-muted hover:bg-muted hover:text-fg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg"
+                  aria-label="Close modal"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div className="px-6 py-4">{children}</div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
 

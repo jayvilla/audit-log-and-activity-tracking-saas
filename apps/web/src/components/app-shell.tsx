@@ -30,7 +30,7 @@ type NavigationItem = {
 };
 
 const allNavigationItems: NavigationItem[] = [
-  { name: 'Audit Logs', href: '/audit-logs', icon: LogIcon, roles: ['member', 'viewer'] },
+  { name: 'Audit Logs', href: '/audit-logs', icon: LogIcon, roles: ['admin', 'member', 'viewer'] },
   { name: 'API Keys', href: '/api-keys', icon: KeyIcon, roles: ['admin'] },
   { name: 'Webhooks', href: '/webhooks', icon: WebhookIcon, comingSoon: true, roles: ['admin'] },
   { name: 'Settings', href: '/settings', icon: SettingsIcon, roles: ['admin', 'member', 'viewer'] },

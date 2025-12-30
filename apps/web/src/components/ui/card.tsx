@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
+import { cardHover, fastTransition, useReducedMotion } from '../../lib/motion';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'bordered' | 'flat';
@@ -9,24 +11,39 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = 'default', children, ...props }, ref) => {
+    const prefersReducedMotion = useReducedMotion();
     const variantClasses = {
       default: 'bg-card border border-border',
       bordered: 'bg-card-2 border border-border',
       flat: 'bg-card-2',
     };
 
+    const baseClasses = cn(
+      'rounded-lg p-6 transition-colors',
+      variantClasses[variant],
+      className
+    );
+
+    if (prefersReducedMotion) {
+      return (
+        <div ref={ref} className={baseClasses} {...props}>
+          {children}
+        </div>
+      );
+    }
+
     return (
-      <div
+      <motion.div
         ref={ref}
-        className={cn(
-          'rounded-lg p-6 transition-colors',
-          variantClasses[variant],
-          className
-        )}
+        className={baseClasses}
+        variants={cardHover}
+        initial="rest"
+        whileHover="hover"
+        transition={fastTransition}
         {...props}
       >
         {children}
-      </div>
+      </motion.div>
     );
   }
 );
