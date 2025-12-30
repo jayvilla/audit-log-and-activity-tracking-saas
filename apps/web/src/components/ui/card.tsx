@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
-import { cardHover, fastTransition, useReducedMotion } from '../../lib/motion';
+import { cardHover, defaultTransition, useReducedMotion } from '../../lib/motion';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'bordered' | 'flat';
@@ -39,7 +39,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
         variants={cardHover}
         initial="rest"
         whileHover="hover"
-        transition={fastTransition}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         {...props}
       >
         {children}

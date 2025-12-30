@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { pageTransition, defaultTransition, useReducedMotion } from '../lib/motion';
+import { pageTransition, defaultTransition, useReducedMotion } from '@audit-log-and-activity-tracking-saas/motion';
 
 interface PageTransitionProps {
   children: React.ReactNode;

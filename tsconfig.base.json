@@ -23,6 +23,9 @@
       ],
       "@audit-log-and-activity-tracking-saas/ui": [
         "libs/shared/ui/src/index.ts"
+      ],
+      "@audit-log-and-activity-tracking-saas/motion": [
+        "libs/shared/motion/src/index.ts"
       ]
     }
   },

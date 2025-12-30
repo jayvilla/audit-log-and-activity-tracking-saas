@@ -1,0 +1,13 @@
+{
+  "name": "@audit-log-and-activity-tracking-saas/motion",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "dependencies": {
+    "framer-motion": "^12.23.26",
+    "react": "^19.0.0",
+    "tslib": "^2.3.0"
+  }
+}
+

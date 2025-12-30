@@ -1,0 +1,22 @@
+{
+  "name": "motion",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/motion/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/shared/motion",
+        "main": "libs/shared/motion/src/index.ts",
+        "tsConfig": "libs/shared/motion/tsconfig.lib.json",
+        "assets": [
+          "libs/shared/motion/*.md"
+        ]
+      }
+    }
+  }
+}
+
