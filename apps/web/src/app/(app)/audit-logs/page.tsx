@@ -332,12 +332,12 @@ export default function AuditLogsPage() {
       )}
 
       {/* Filters */}
-      <div className="border border-border rounded-lg p-6 space-y-4" role="region" aria-labelledby="filters-heading">
+      <div className="border border-border rounded-lg bg-[hsl(var(--card))] p-6 space-y-4" role="region" aria-labelledby="filters-heading">
         <h2 id="filters-heading" className="text-sm font-semibold text-fg">Filters</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Date Range */}
           <div className="space-y-2">
-            <label htmlFor="filter-start-date" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-start-date" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               Start Date
             </label>
             <Input
@@ -352,7 +352,7 @@ export default function AuditLogsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="filter-end-date" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-end-date" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               End Date
             </label>
             <Input
@@ -369,7 +369,7 @@ export default function AuditLogsPage() {
 
           {/* Action */}
           <div className="space-y-2">
-            <label htmlFor="filter-action" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-action" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               Action
             </label>
             <Input
@@ -384,7 +384,7 @@ export default function AuditLogsPage() {
 
           {/* Actor Type */}
           <div className="space-y-2">
-            <label htmlFor="filter-actor-type" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-actor-type" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               Actor Type
             </label>
             <Select
@@ -402,7 +402,7 @@ export default function AuditLogsPage() {
 
           {/* Resource Type */}
           <div className="space-y-2">
-            <label htmlFor="filter-resource-type" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-resource-type" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               Resource Type
             </label>
             <Input
@@ -417,7 +417,7 @@ export default function AuditLogsPage() {
 
           {/* Resource ID */}
           <div className="space-y-2">
-            <label htmlFor="filter-resource-id" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-resource-id" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               Resource ID
             </label>
             <Input
@@ -432,7 +432,7 @@ export default function AuditLogsPage() {
 
           {/* Metadata Text */}
           <div className="md:col-span-2 lg:col-span-3 space-y-2">
-            <label htmlFor="filter-metadata" className="block text-xs font-medium text-muted">
+            <label htmlFor="filter-metadata" className="block text-xs font-medium text-[hsl(var(--foreground))]">
               Metadata Search
             </label>
             <Input
@@ -448,7 +448,7 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Results Table */}
-      <div className="border border-border rounded-lg overflow-hidden" role="region" aria-labelledby="audit-logs-heading">
+      <div className="border border-border rounded-lg bg-[hsl(var(--card))] overflow-hidden" role="region" aria-labelledby="audit-logs-heading">
         {events.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center py-16 px-6" role="status" aria-live="polite">
             <svg
@@ -474,22 +474,22 @@ export default function AuditLogsPage() {
               <Table role="table" aria-label="Audit events">
                 <TableHeader>
                   <TableRow hover={false}>
-                    <TableHead className="min-w-[180px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
+                    <TableHead className="min-w-[180px] text-xs font-semibold text-[hsl(var(--foreground))] uppercase tracking-wider" scope="col">
                       Timestamp
                     </TableHead>
-                    <TableHead className="min-w-[200px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
+                    <TableHead className="min-w-[200px] text-xs font-semibold text-[hsl(var(--foreground))] uppercase tracking-wider" scope="col">
                       Actor
                     </TableHead>
-                    <TableHead className="min-w-[120px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
+                    <TableHead className="min-w-[120px] text-xs font-semibold text-[hsl(var(--foreground))] uppercase tracking-wider" scope="col">
                       Action
                     </TableHead>
-                    <TableHead className="min-w-[250px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
+                    <TableHead className="min-w-[250px] text-xs font-semibold text-[hsl(var(--foreground))] uppercase tracking-wider" scope="col">
                       Resource
                     </TableHead>
-                    <TableHead className="min-w-[140px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
+                    <TableHead className="min-w-[140px] text-xs font-semibold text-[hsl(var(--foreground))] uppercase tracking-wider" scope="col">
                       IP Address
                     </TableHead>
-                    <TableHead className="min-w-[120px] text-xs font-semibold text-muted uppercase tracking-wider" scope="col">
+                    <TableHead className="min-w-[120px] text-xs font-semibold text-[hsl(var(--foreground))] uppercase tracking-wider" scope="col">
                       Details
                     </TableHead>
                   </TableRow>
