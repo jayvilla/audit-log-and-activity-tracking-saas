@@ -26,6 +26,7 @@
   /* Semantic Colors */
   --danger: #f87171;
   --success: #4ade80;
+  --warning: #fbbf24;
 }
 
 /* Base Styles */
@@ -186,6 +187,10 @@
   
   .bg-success {
     background-color: var(--success);
+  }
+  
+  .bg-warning {
+    background-color: var(--warning);
   }
   
   /* Text utilities */

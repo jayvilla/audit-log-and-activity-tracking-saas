@@ -34,6 +34,7 @@ module.exports = {
         'accent-2': 'var(--accent-2)',
         danger: 'var(--danger)',
         success: 'var(--success)',
+        warning: 'var(--warning)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
