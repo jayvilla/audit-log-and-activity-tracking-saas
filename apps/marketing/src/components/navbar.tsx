@@ -13,6 +13,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { scrollY } = useScroll();
   const prefersReducedMotion = useReducedMotion();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
     setScrolled(latest > 20);
@@ -58,12 +59,18 @@ export function Navbar() {
               Docs
             </Link>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" href="/login">
+              <a
+                href={`${appUrl}/login`}
+                className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent2))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--bg))] bg-transparent hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]"
+              >
                 Log in
-              </Button>
-              <Button variant="default" size="sm" href="/signup">
+              </a>
+              <a
+                href={`${appUrl}/login`}
+                className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent2))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--bg))] bg-[hsl(var(--accent2))] text-[hsl(var(--accent2-foreground))] hover:opacity-90"
+              >
                 Get started
-              </Button>
+              </a>
             </div>
           </div>
 
@@ -121,24 +128,20 @@ export function Navbar() {
               Docs
             </Link>
             <div className="flex flex-col space-y-2 pt-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                href="/login"
-                className="w-full"
+              <a
+                href={`${appUrl}/login`}
+                className="w-full inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent2))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--bg))] bg-transparent hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]"
                 onClick={() => setIsOpen(false)}
               >
                 Log in
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                href="/signup"
-                className="w-full"
+              </a>
+              <a
+                href={`${appUrl}/login`}
+                className="w-full inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent2))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--bg))] bg-[hsl(var(--accent2))] text-[hsl(var(--accent2-foreground))] hover:opacity-90"
                 onClick={() => setIsOpen(false)}
               >
                 Get started
-              </Button>
+              </a>
             </div>
           </div>
         </div>

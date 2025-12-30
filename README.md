@@ -146,6 +146,16 @@ WEB_ORIGIN=http://localhost:3000
 
 # Next.js Public API URL (used by web app to call API)
 NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# Marketing App - Site URL for SEO metadata, canonical URLs, sitemap, and robots.txt
+NEXT_PUBLIC_SITE_URL=http://localhost:3001
+
+# Cross-App Linking
+# Web app uses this to link back to marketing site (e.g., "Back to home" on login page)
+NEXT_PUBLIC_MARKETING_URL=http://localhost:3001
+
+# Marketing app uses this to link to web app (e.g., "Sign in / Sign up" buttons)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 **Security Notes:**
@@ -159,18 +169,39 @@ If running the API independently, you can also create `apps/api/.env` with datab
 
 ### Marketing App `.env` (Optional)
 
-The marketing app uses `NEXT_PUBLIC_SITE_URL` for SEO metadata, canonical URLs, sitemap generation, and robots.txt. Create `apps/marketing/.env` or set the variable in your root `.env`:
+The marketing app uses several environment variables. Create `apps/marketing/.env` or set the variables in your root `.env`:
 
 ```env
 # Marketing App - Site URL for SEO
 NEXT_PUBLIC_SITE_URL=http://localhost:3001
+
+# Marketing app uses this to link to web app (e.g., "Sign in / Sign up" buttons)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-**Note:** In production, set this to your actual domain (e.g., `https://auditlog.example.com`). This is used for:
-- OpenGraph and Twitter card metadata
-- Canonical URLs
-- Sitemap generation
-- Robots.txt generation
+**Note:** In production, set these to your actual domains:
+- `NEXT_PUBLIC_SITE_URL` - Marketing site domain (e.g., `https://auditlog.example.com`)
+- `NEXT_PUBLIC_APP_URL` - Web app domain (e.g., `https://app.auditlog.example.com`)
+
+**Uses:**
+- `NEXT_PUBLIC_SITE_URL`: OpenGraph and Twitter card metadata, canonical URLs, sitemap generation, robots.txt
+- `NEXT_PUBLIC_APP_URL`: Links in navbar and footer to sign in/sign up pages
+
+### Web App `.env` (Optional)
+
+The web app uses several environment variables. Create `apps/web/.env` or set the variables in your root `.env`:
+
+```env
+# Next.js Public API URL (used by web app to call API)
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# Web app uses this to link back to marketing site (e.g., "Back to home" on login page)
+NEXT_PUBLIC_MARKETING_URL=http://localhost:3001
+```
+
+**Note:** In production, set these to your actual domains:
+- `NEXT_PUBLIC_API_URL` - API domain (e.g., `https://api.auditlog.example.com/api`)
+- `NEXT_PUBLIC_MARKETING_URL` - Marketing site domain (e.g., `https://auditlog.example.com`)
 
 ---
 
