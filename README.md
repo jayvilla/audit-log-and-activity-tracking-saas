@@ -214,6 +214,61 @@ docker run -p 3000:3000 \
   cursor-rules-web:latest
 ```
 
+## Testing
+
+### API Integration Tests
+
+The API includes integration tests that use Jest + supertest to test the full HTTP stack with a real PostgreSQL database.
+
+**Prerequisites:**
+- PostgreSQL must be running (via Docker or locally)
+- Test database will be created automatically if it doesn't exist
+
+**Running Tests:**
+
+1. **Ensure PostgreSQL is running:**
+   ```bash
+   pnpm docker:up
+   ```
+
+2. **Set test database environment variable (optional):**
+   ```bash
+   # Defaults to 'audit_test' if not set
+   export DB_DATABASE_TEST=audit_test
+   ```
+
+3. **Run all integration tests:**
+   ```bash
+   pnpm nx test api
+   ```
+
+4. **Run tests in watch mode:**
+   ```bash
+   pnpm nx test api --watch
+   ```
+
+**Test Coverage:**
+
+The integration tests cover:
+- ✅ Login sets session cookie (httpOnly)
+- ✅ `/auth/me` endpoint works with session cookie
+- ✅ Audit event ingestion with API key authentication
+- ✅ RBAC: Members can only see their own user events, admins see all org events
+
+**Test Database:**
+
+Tests use a dedicated test database (`audit_test` by default) that is:
+- Created automatically if it doesn't exist
+- Migrated automatically before tests run
+- Truncated between tests to ensure isolation
+- Never affects your development database
+
+**Test Structure:**
+
+- Tests are located in `apps/api/src/**/*.integration.spec.ts`
+- Test utilities are in `apps/api/src/test/`
+- Global setup/teardown handles database creation and migrations
+
 ## Run tasks
 
 To run tasks with Nx use:

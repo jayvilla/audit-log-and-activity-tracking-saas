@@ -101,6 +101,14 @@
         "command": "pnpm exec tsx apps/api/src/webhook-worker.ts",
         "cwd": "{workspaceRoot}"
       }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/api"],
+      "options": {
+        "jestConfig": "apps/api/jest.config.ts",
+        "passWithNoTests": true
+      }
     }
   },
   "tags": ["type:app", "scope:api"],

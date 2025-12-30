@@ -21,6 +21,7 @@ import { UserRole } from '../../entities/user.entity';
 import { WebhooksService } from './webhooks.service';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
+// Session type augmentation is automatically included via tsconfig
 
 @ApiTags('webhooks')
 @Controller('v1/webhooks')
