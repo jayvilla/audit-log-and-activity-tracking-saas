@@ -98,49 +98,17 @@ export default function AuditLogsPage() {
           metadataText: searchQuery || undefined,
           startDate: startDate?.toISOString(),
           endDate: endDate?.toISOString(),
-          action: actions.length === 1 ? actions[0] : undefined,
+          action: actions.length > 0 ? actions : undefined,
           resourceType: resourceTypeFilter || undefined,
           resourceId: resourceIdFilter || undefined,
-          // TODO: Backend doesn't support these filters yet
-          // actorType: actorFilter ? 'user' : undefined,
-          // ipAddress: ipFilter || undefined,
+          status: statuses.length > 0 ? statuses : undefined,
+          actorId: actorFilter || undefined,
+          ipAddress: ipFilter || undefined,
         };
 
-        // TODO: Backend doesn't support multiple actions filter - filter client-side for now
         const response = await getAuditEvents(params);
         if (response) {
-          let filtered = response.data || [];
-          
-          // Client-side filtering for multiple actions
-          if (actions.length > 1) {
-            filtered = filtered.filter(log => actions.includes(log.action));
-          }
-          
-          // Client-side filtering for status (backend doesn't have status field)
-          // For now, we'll assume all are 'success' unless metadata indicates otherwise
-          if (statuses.length > 0) {
-            filtered = filtered.filter(log => {
-              const logStatus = log.metadata?.status || 'success';
-              return statuses.includes(logStatus);
-            });
-          }
-
-          // Client-side actor filter
-          if (actorFilter) {
-            const query = actorFilter.toLowerCase();
-            filtered = filtered.filter(log =>
-              log.actorId?.toLowerCase().includes(query)
-            );
-          }
-
-          // Client-side IP filter
-          if (ipFilter) {
-            filtered = filtered.filter(log =>
-              log.ipAddress?.includes(ipFilter)
-            );
-          }
-
-          setLogs(filtered);
+          setLogs(response.data || []);
         }
       } catch (err: any) {
         console.error('Failed to load audit logs:', err);
@@ -307,9 +275,12 @@ export default function AuditLogsPage() {
       const params: GetAuditEventsParams = {
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
-        action: actions.length === 1 ? actions[0] : undefined,
+        action: actions.length > 0 ? actions : undefined,
         resourceType: resourceTypeFilter || undefined,
         resourceId: resourceIdFilter || undefined,
+        status: statuses.length > 0 ? statuses : undefined,
+        actorId: actorFilter || undefined,
+        ipAddress: ipFilter || undefined,
         metadataText: searchQuery || undefined,
       };
 
@@ -836,7 +807,7 @@ export default function AuditLogsPage() {
                       </TableCell>
                       <TableCell>
                         <code className="text-xs bg-accent-10 px-2 py-1 rounded text-accent">
-                          {log.action}
+                          {log.actorType}:{log.action}
                         </code>
                       </TableCell>
                       <TableCell>

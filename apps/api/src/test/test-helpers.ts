@@ -123,6 +123,9 @@ export async function createTestAuditEvent(
   action: string = 'test.action',
   resourceType: string = 'test',
   resourceId: string = 'test-id',
+  metadata?: Record<string, any> | null,
+  ipAddress?: string | null,
+  userAgent?: string | null,
 ): Promise<AuditEventEntity> {
   const dataSource = getDataSourceForTests();
   const auditRepo = dataSource.getRepository(AuditEventEntity);
@@ -134,9 +137,9 @@ export async function createTestAuditEvent(
     action,
     resourceType,
     resourceId,
-    metadata: null,
-    ipAddress: null,
-    userAgent: null,
+    metadata: metadata !== undefined ? metadata : null,
+    ipAddress: ipAddress !== undefined ? ipAddress : null,
+    userAgent: userAgent !== undefined ? userAgent : null,
   });
   const saved = await auditRepo.save(event);
   

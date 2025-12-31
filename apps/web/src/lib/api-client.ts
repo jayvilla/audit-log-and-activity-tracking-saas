@@ -150,10 +150,13 @@ export interface GetAuditEventsParams {
   cursor?: string;
   startDate?: string;
   endDate?: string;
-  action?: string;
+  action?: string | string[];
   actorType?: 'user' | 'api-key' | 'system';
+  actorId?: string;
   resourceType?: string;
   resourceId?: string;
+  status?: string | string[];
+  ipAddress?: string;
   metadataText?: string;
   limit?: number;
 }
@@ -190,10 +193,31 @@ export async function getAuditEvents(
   if (params.cursor) queryParams.append('cursor', params.cursor);
   if (params.startDate) queryParams.append('startDate', params.startDate);
   if (params.endDate) queryParams.append('endDate', params.endDate);
-  if (params.action) queryParams.append('action', params.action);
+  
+  // Handle action(s) - can be string or array
+  if (params.action) {
+    if (Array.isArray(params.action)) {
+      queryParams.append('action', params.action.join(','));
+    } else {
+      queryParams.append('action', params.action);
+    }
+  }
+  
   if (params.actorType) queryParams.append('actorType', params.actorType);
+  if (params.actorId) queryParams.append('actorId', params.actorId);
   if (params.resourceType) queryParams.append('resourceType', params.resourceType);
   if (params.resourceId) queryParams.append('resourceId', params.resourceId);
+  
+  // Handle status(es) - can be string or array
+  if (params.status) {
+    if (Array.isArray(params.status)) {
+      queryParams.append('status', params.status.join(','));
+    } else {
+      queryParams.append('status', params.status);
+    }
+  }
+  
+  if (params.ipAddress) queryParams.append('ipAddress', params.ipAddress);
   if (params.metadataText) queryParams.append('metadataText', params.metadataText);
   if (params.limit) queryParams.append('limit', params.limit.toString());
 
@@ -220,10 +244,31 @@ export async function exportAuditEventsAsJson(
   
   if (params.startDate) queryParams.append('startDate', params.startDate);
   if (params.endDate) queryParams.append('endDate', params.endDate);
-  if (params.action) queryParams.append('action', params.action);
+  
+  // Handle action(s) - can be string or array
+  if (params.action) {
+    if (Array.isArray(params.action)) {
+      queryParams.append('action', params.action.join(','));
+    } else {
+      queryParams.append('action', params.action);
+    }
+  }
+  
   if (params.actorType) queryParams.append('actorType', params.actorType);
+  if (params.actorId) queryParams.append('actorId', params.actorId);
   if (params.resourceType) queryParams.append('resourceType', params.resourceType);
   if (params.resourceId) queryParams.append('resourceId', params.resourceId);
+  
+  // Handle status(es) - can be string or array
+  if (params.status) {
+    if (Array.isArray(params.status)) {
+      queryParams.append('status', params.status.join(','));
+    } else {
+      queryParams.append('status', params.status);
+    }
+  }
+  
+  if (params.ipAddress) queryParams.append('ipAddress', params.ipAddress);
   if (params.metadataText) queryParams.append('metadataText', params.metadataText);
 
   const response = await fetch(`${API_URL}/v1/audit-events/export.json?${queryParams.toString()}`, {
@@ -252,10 +297,31 @@ export async function exportAuditEventsAsCsv(
   
   if (params.startDate) queryParams.append('startDate', params.startDate);
   if (params.endDate) queryParams.append('endDate', params.endDate);
-  if (params.action) queryParams.append('action', params.action);
+  
+  // Handle action(s) - can be string or array
+  if (params.action) {
+    if (Array.isArray(params.action)) {
+      queryParams.append('action', params.action.join(','));
+    } else {
+      queryParams.append('action', params.action);
+    }
+  }
+  
   if (params.actorType) queryParams.append('actorType', params.actorType);
+  if (params.actorId) queryParams.append('actorId', params.actorId);
   if (params.resourceType) queryParams.append('resourceType', params.resourceType);
   if (params.resourceId) queryParams.append('resourceId', params.resourceId);
+  
+  // Handle status(es) - can be string or array
+  if (params.status) {
+    if (Array.isArray(params.status)) {
+      queryParams.append('status', params.status.join(','));
+    } else {
+      queryParams.append('status', params.status);
+    }
+  }
+  
+  if (params.ipAddress) queryParams.append('ipAddress', params.ipAddress);
   if (params.metadataText) queryParams.append('metadataText', params.metadataText);
 
   const response = await fetch(`${API_URL}/v1/audit-events/export.csv?${queryParams.toString()}`, {

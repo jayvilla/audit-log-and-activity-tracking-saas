@@ -220,10 +220,17 @@ export class AuditEventsService {
       });
     }
 
-    if (query.action) {
-      queryBuilder.andWhere('audit_event.action = :action', {
-        action: query.action,
-      });
+    // Filter by action(s) - support multiple actions
+    if (query.action && query.action.length > 0) {
+      if (query.action.length === 1) {
+        queryBuilder.andWhere('audit_event.action = :action', {
+          action: query.action[0],
+        });
+      } else {
+        queryBuilder.andWhere('audit_event.action IN (:...actions)', {
+          actions: query.action,
+        });
+      }
     }
 
     if (query.actorType) {
@@ -246,6 +253,44 @@ export class AuditEventsService {
     if (query.resourceId) {
       queryBuilder.andWhere('audit_event.resourceId = :resourceId', {
         resourceId: query.resourceId,
+      });
+    }
+
+    // Filter by actor ID (partial match, case-insensitive)
+    if (query.actorId) {
+      queryBuilder.andWhere('audit_event.actorId ILIKE :actorId', {
+        actorId: `%${query.actorId}%`,
+      });
+    }
+
+    // Filter by status(es) - derived from metadata.status
+    // NULL metadata.status defaults to 'success' (matching UI behavior)
+    if (query.status && query.status.length > 0) {
+      const hasSuccess = query.status.includes('success');
+      const hasFailure = query.status.includes('failure');
+      
+      if (hasSuccess && hasFailure) {
+        // Both statuses selected - match all (no filter needed, or match any status including NULL)
+        // Since NULL = success and 'failure' = failure, we match everything
+        // This is equivalent to no filter, but we'll keep it explicit
+        queryBuilder.andWhere(
+          "(audit_event.metadata->>'status' = 'failure' OR audit_event.metadata->>'status' = 'success' OR audit_event.metadata->>'status' IS NULL)"
+        );
+      } else if (hasSuccess) {
+        // Only success - match where status is 'success' or NULL
+        queryBuilder.andWhere(
+          "(audit_event.metadata->>'status' = 'success' OR audit_event.metadata->>'status' IS NULL)"
+        );
+      } else if (hasFailure) {
+        // Only failure - match where status is 'failure'
+        queryBuilder.andWhere("audit_event.metadata->>'status' = 'failure'");
+      }
+    }
+
+    // Filter by IP address (partial match, case-insensitive)
+    if (query.ipAddress) {
+      queryBuilder.andWhere('audit_event.ipAddress ILIKE :ipAddress', {
+        ipAddress: `%${query.ipAddress}%`,
       });
     }
 

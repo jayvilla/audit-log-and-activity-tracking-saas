@@ -164,5 +164,213 @@ describe('Audit Events Integration (e2e)', () => {
       expect(response.body.data[0].actorType).toBe('user');
     });
   });
+
+  describe('GET /api/v1/audit-events (Filtering)', () => {
+    it('should filter by multiple actions', async () => {
+      const org = await createTestOrganization('Test Org');
+      const { createTestUser } = await import('../../test/test-helpers');
+      const { UserRole } = await import('../../entities/user.entity');
+      const admin = await createTestUser(org.id, 'admin@example.com', 'password123', UserRole.ADMIN);
+      
+      // Create events with different actions
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-1');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'update', 'user', 'user-2');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'delete', 'user', 'user-3');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'read', 'user', 'user-4');
+
+      const agent = getTestAgent(app);
+      const csrfResponse = await agent.get('/api/auth/csrf').expect(200);
+      const csrfToken = csrfResponse.body.token;
+      
+      await agent
+        .post('/api/auth/login')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          email: 'admin@example.com',
+          password: 'password123',
+        })
+        .expect(200);
+
+      // Filter by multiple actions (comma-separated)
+      const response = await agent
+        .get('/api/v1/audit-events?action=create,update')
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data.every((e: any) => ['create', 'update'].includes(e.action))).toBe(true);
+    });
+
+    it('should filter by status (success)', async () => {
+      const org = await createTestOrganization('Test Org');
+      const { createTestUser } = await import('../../test/test-helpers');
+      const { UserRole } = await import('../../entities/user.entity');
+      const admin = await createTestUser(org.id, 'admin@example.com', 'password123', UserRole.ADMIN);
+      
+      // Create events with different statuses
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-1', { status: 'success' });
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-2', null); // NULL = success
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-3', { status: 'failure' });
+
+      const agent = getTestAgent(app);
+      const csrfResponse = await agent.get('/api/auth/csrf').expect(200);
+      const csrfToken = csrfResponse.body.token;
+      
+      await agent
+        .post('/api/auth/login')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          email: 'admin@example.com',
+          password: 'password123',
+        })
+        .expect(200);
+
+      // Filter by success status
+      const response = await agent
+        .get('/api/v1/audit-events?status=success')
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data.every((e: any) => 
+        e.metadata?.status === 'success' || e.metadata === null
+      )).toBe(true);
+    });
+
+    it('should filter by status (failure)', async () => {
+      const org = await createTestOrganization('Test Org');
+      const { createTestUser } = await import('../../test/test-helpers');
+      const { UserRole } = await import('../../entities/user.entity');
+      const admin = await createTestUser(org.id, 'admin@example.com', 'password123', UserRole.ADMIN);
+      
+      // Create events with different statuses
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-1', { status: 'success' });
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-2', null); // NULL = success
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-3', { status: 'failure' });
+
+      const agent = getTestAgent(app);
+      const csrfResponse = await agent.get('/api/auth/csrf').expect(200);
+      const csrfToken = csrfResponse.body.token;
+      
+      await agent
+        .post('/api/auth/login')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          email: 'admin@example.com',
+          password: 'password123',
+        })
+        .expect(200);
+
+      // Filter by failure status
+      const response = await agent
+        .get('/api/v1/audit-events?status=failure')
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].metadata?.status).toBe('failure');
+    });
+
+    it('should filter by actorId (partial match)', async () => {
+      const org = await createTestOrganization('Test Org');
+      const { createTestUser } = await import('../../test/test-helpers');
+      const { UserRole } = await import('../../entities/user.entity');
+      const admin1 = await createTestUser(org.id, 'admin1@example.com', 'password123', UserRole.ADMIN);
+      const admin2 = await createTestUser(org.id, 'admin2@example.com', 'password123', UserRole.ADMIN);
+      
+      // Create events from different actors
+      await createTestAuditEvent(org.id, ActorType.USER, admin1.id, 'create', 'user', 'user-1');
+      await createTestAuditEvent(org.id, ActorType.USER, admin2.id, 'create', 'user', 'user-2');
+
+      const agent = getTestAgent(app);
+      const csrfResponse = await agent.get('/api/auth/csrf').expect(200);
+      const csrfToken = csrfResponse.body.token;
+      
+      await agent
+        .post('/api/auth/login')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          email: 'admin1@example.com',
+          password: 'password123',
+        })
+        .expect(200);
+
+      // Filter by actorId (partial match - using first 8 chars of UUID)
+      const partialId = admin1.id.substring(0, 8);
+      const response = await agent
+        .get(`/api/v1/audit-events?actorId=${partialId}`)
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].actorId).toBe(admin1.id);
+    });
+
+    it('should filter by ipAddress (partial match)', async () => {
+      const org = await createTestOrganization('Test Org');
+      const { createTestUser } = await import('../../test/test-helpers');
+      const { UserRole } = await import('../../entities/user.entity');
+      const admin = await createTestUser(org.id, 'admin@example.com', 'password123', UserRole.ADMIN);
+      
+      // Create events with different IP addresses
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-1', null, '192.168.1.100');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-2', null, '192.168.1.200');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-3', null, '10.0.0.1');
+
+      const agent = getTestAgent(app);
+      const csrfResponse = await agent.get('/api/auth/csrf').expect(200);
+      const csrfToken = csrfResponse.body.token;
+      
+      await agent
+        .post('/api/auth/login')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          email: 'admin@example.com',
+          password: 'password123',
+        })
+        .expect(200);
+
+      // Filter by IP address (partial match)
+      const response = await agent
+        .get('/api/v1/audit-events?ipAddress=192.168.1')
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data.every((e: any) => e.ipAddress?.startsWith('192.168.1'))).toBe(true);
+    });
+
+    it('should combine multiple filters', async () => {
+      const org = await createTestOrganization('Test Org');
+      const { createTestUser } = await import('../../test/test-helpers');
+      const { UserRole } = await import('../../entities/user.entity');
+      const admin = await createTestUser(org.id, 'admin@example.com', 'password123', UserRole.ADMIN);
+      
+      // Create various events
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-1', { status: 'success' }, '192.168.1.100');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'update', 'user', 'user-2', { status: 'success' }, '192.168.1.100');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'user', 'user-3', { status: 'failure' }, '192.168.1.100');
+      await createTestAuditEvent(org.id, ActorType.USER, admin.id, 'create', 'document', 'doc-1', { status: 'success' }, '192.168.1.100');
+
+      const agent = getTestAgent(app);
+      const csrfResponse = await agent.get('/api/auth/csrf').expect(200);
+      const csrfToken = csrfResponse.body.token;
+      
+      await agent
+        .post('/api/auth/login')
+        .set('x-csrf-token', csrfToken)
+        .send({
+          email: 'admin@example.com',
+          password: 'password123',
+        })
+        .expect(200);
+
+      // Combine filters: action=create, status=success, resourceType=user, ipAddress=192.168.1.100
+      const response = await agent
+        .get('/api/v1/audit-events?action=create&status=success&resourceType=user&ipAddress=192.168.1.100')
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].action).toBe('create');
+      expect(response.body.data[0].resourceType).toBe('user');
+      expect(response.body.data[0].ipAddress).toBe('192.168.1.100');
+      expect(response.body.data[0].metadata?.status === 'success' || response.body.data[0].metadata === null).toBe(true);
+    });
+  });
 });
 
