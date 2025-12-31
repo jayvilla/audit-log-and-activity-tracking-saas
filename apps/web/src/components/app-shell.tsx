@@ -5,8 +5,24 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '../lib/utils';
 import { getMe, logout } from '../lib/api-client';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from './ui/dropdown-menu';
-import { Input } from './ui/input';
+import {
+  Button,
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+} from '@audit-log-and-activity-tracking-saas/ui';
+import {
+  LayoutDashboard,
+  FileText,
+  Key,
+  Webhook,
+  Settings,
+  HelpCircle,
+  LogOut,
+  Menu,
+  Search,
+  ChevronDown,
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -30,10 +46,11 @@ type NavigationItem = {
 };
 
 const allNavigationItems: NavigationItem[] = [
-  { name: 'Audit Logs', href: '/audit-logs', icon: LogIcon, roles: ['admin', 'member', 'viewer'] },
-  { name: 'API Keys', href: '/api-keys', icon: KeyIcon, roles: ['admin'] },
-  { name: 'Webhooks', href: '/webhooks', icon: WebhookIcon, comingSoon: true, roles: ['admin'] },
-  { name: 'Settings', href: '/settings', icon: SettingsIcon, roles: ['admin', 'member', 'viewer'] },
+  { name: 'Overview', href: '/overview', icon: LayoutDashboard, roles: ['admin', 'member', 'viewer'] },
+  { name: 'Audit Logs', href: '/audit-logs', icon: FileText, roles: ['admin', 'member', 'viewer'] },
+  { name: 'API Keys', href: '/api-keys', icon: Key, roles: ['admin'] },
+  { name: 'Webhooks', href: '/webhooks', icon: Webhook, comingSoon: true, roles: ['admin'] },
+  { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin', 'member', 'viewer'] },
 ];
 
 function getNavigationForRole(role: 'admin' | 'member' | 'viewer'): NavigationItem[] {
@@ -47,6 +64,7 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -101,6 +119,8 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
     return null;
   }
 
+  const navItems = getNavigationForRole(user.role);
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
       {/* Sidebar */}
@@ -110,53 +130,119 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        {/* Logo/Product Name */}
-        <div className="flex h-16 items-center border-b border-border px-6">
-          <Link href="/audit-logs" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
-              <span className="text-sm font-bold text-fg-on-accent">AL</span>
+        {/* Logo */}
+        <div className="flex h-16 items-center gap-2 border-b border-border px-6">
+          <Link href="/overview" className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="h-4 w-4 text-fg-on-accent"
+              >
+                <path
+                  d="M12 2L2 7L12 12L22 7L12 2Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 17L12 22L22 17"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 12L12 17L22 12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
-            <span className="text-lg font-semibold text-fg">AuditLog</span>
+            <span className="font-semibold text-sm text-fg">AuditLog</span>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {getNavigationForRole(user.role).map((item) => {
+        <nav className="flex-1 space-y-1 p-3">
+          {navItems.map((item) => {
+            const Icon = item.icon;
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-            return (
-              <Link
+            return item.comingSoon ? (
+              <button
                 key={item.name}
-                href={item.comingSoon ? '#' : item.href}
+                disabled
+                className={cn(
+                  'w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'text-fg-muted opacity-50 cursor-not-allowed',
+                  'flex items-center'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="text-sm">{item.name}</span>
+              </button>
+            ) : (
+              <Button
+                key={item.name}
+                variant={isActive ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start gap-3',
+                  isActive
+                    ? 'bg-accent text-fg'
+                    : 'text-fg-muted hover:text-fg hover:bg-accent-10'
+                )}
+                href={item.href}
                 onClick={() => {
                   if (isMobile) {
                     setSidebarOpen(false);
                   }
                 }}
-                className={cn(
-                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-bg-card text-fg'
-                    : 'text-fg-muted hover:bg-bg-card hover:text-fg',
-                  item.comingSoon && 'cursor-not-allowed opacity-50'
-                )}
               >
-                <item.icon
-                  className={cn(
-                    'h-5 w-5 flex-shrink-0',
-                    isActive ? 'text-accent' : 'text-fg-muted group-hover:text-fg'
-                  )}
-                />
-                <span className="flex-1">{item.name}</span>
-                {item.comingSoon && (
-                  <span className="rounded-full bg-bg-card px-2 py-0.5 text-xs text-fg-muted">
-                    Soon
-                  </span>
-                )}
-              </Link>
+                <Icon className="h-4 w-4" />
+                <span className="text-sm">{item.name}</span>
+              </Button>
             );
           })}
         </nav>
+
+        {/* Bottom section */}
+        <div className="border-t border-border p-3 space-y-1">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-fg-muted hover:text-fg hover:bg-accent-10"
+            href="#"
+          >
+            <HelpCircle className="h-4 w-4" />
+            <span className="text-sm">Help & Support</span>
+          </Button>
+
+          {/* User profile */}
+          <div className="flex items-center gap-3 rounded-lg p-2 hover:bg-accent-10 cursor-pointer group">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=8b5cf6&color=fff`} />
+              <AvatarFallback className="bg-accent text-fg-on-accent">
+                {user.email.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate text-fg">
+                {user.name || user.email.split('@')[0]}
+              </p>
+              <p className="text-xs text-fg-muted truncate">{user.email}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -172,13 +258,15 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
         {/* Topbar */}
         <header className="flex h-16 items-center gap-4 border-b border-border bg-bg-card px-4 lg:px-6">
           {/* Mobile menu button */}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden rounded-lg p-2 text-fg-muted hover:bg-bg-card hover:text-fg"
             aria-label="Toggle sidebar"
           >
-            <MenuIcon className="h-5 w-5" />
-          </button>
+            <Menu className="h-5 w-5" />
+          </Button>
 
           {/* Page title */}
           <h1 className="flex-1 text-lg font-semibold text-fg">
@@ -188,39 +276,15 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
           {/* Search input */}
           <div className="hidden md:block">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
-              <Input
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
+              <input
                 type="search"
                 placeholder="Search..."
-                className="w-64 pl-9"
+                className="w-64 rounded-md border border-border bg-bg-card px-3 py-2 pl-9 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg"
                 disabled
               />
             </div>
           </div>
-
-          {/* User menu */}
-          <DropdownMenu
-            trigger={
-              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-bg-card">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-medium text-fg-on-accent">
-                  {user.email.charAt(0).toUpperCase()}
-                </div>
-                <div className="hidden text-left md:block">
-                  <div className="text-xs font-medium text-fg">{user.email}</div>
-                  <div className="text-xs text-fg-muted capitalize">{user.role}</div>
-                </div>
-                <ChevronDownIcon className="hidden h-4 w-4 text-fg-muted md:block" />
-              </button>
-            }
-            align="right"
-          >
-            <div className="px-3 py-2">
-              <div className="text-xs font-medium text-fg">{user.email}</div>
-              <div className="text-xs text-fg-muted capitalize">{user.role}</div>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-          </DropdownMenu>
         </header>
 
         {/* Main content */}
@@ -237,144 +301,3 @@ function getPageTitle(pathname: string | null): string {
   const route = allNavigationItems.find((item) => pathname === item.href || pathname.startsWith(item.href + '/'));
   return route?.name || 'Dashboard';
 }
-
-// Icons
-function LogIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-      />
-    </svg>
-  );
-}
-
-function KeyIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-      />
-    </svg>
-  );
-}
-
-function WebhookIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M13 10V3L4 14h7v7l9-11h-7z"
-      />
-    </svg>
-  );
-}
-
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-      />
-    </svg>
-  );
-}
-
-function MenuIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 6h16M4 12h16M4 18h16"
-      />
-    </svg>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-      />
-    </svg>
-  );
-}
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M19 9l-7 7-7-7"
-      />
-    </svg>
-  );
-}
-

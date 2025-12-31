@@ -53,3 +53,24 @@ export type {
 
 export { Modal } from './lib/modal';
 export type { ModalProps } from './lib/modal';
+
+export { Label } from './lib/label';
+export type { LabelProps } from './lib/label';
+
+export { Separator } from './lib/separator';
+export type { SeparatorProps } from './lib/separator';
+
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from './lib/dialog';
+
+export { Avatar, AvatarImage, AvatarFallback } from './lib/avatar';

@@ -1,480 +1,401 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getApiKeys, createApiKey, revokeApiKey, type ApiKey, type CreateApiKeyRequest } from '../../../lib/api-client';
+import {
+  getApiKeys,
+  createApiKey,
+  revokeApiKey,
+  type ApiKey,
+  type CreateApiKeyRequest,
+  type CreateApiKeyResponse,
+} from '../../../lib/api-client';
 import { usePageTitle } from '../../../lib/use-page-title';
 import {
-  Card,
-  CardContent,
   Button,
   Input,
-  Modal,
   Badge,
   Table,
-  TableHeader,
   TableBody,
-  TableRow,
-  TableHead,
   TableCell,
-  Skeleton,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Label,
 } from '@audit-log-and-activity-tracking-saas/ui';
-import { DropdownMenu, DropdownMenuItem } from '../../../components/ui/dropdown-menu';
-import { cn } from '../../../lib/utils';
+import {
+  Plus,
+  Copy,
+  Trash2,
+  Eye,
+  EyeOff,
+  AlertCircle,
+} from 'lucide-react';
 
 export default function ApiKeysPage() {
   usePageTitle('API Keys');
-  
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+
+  const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
-  const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyData, setNewKeyData] = useState<{ key: string; name: string } | null>(null);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
-  const [isRevoking, setIsRevoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadApiKeys();
+    async function loadKeys() {
+      setIsLoading(true);
+      try {
+        const apiKeys = await getApiKeys();
+        setKeys(apiKeys);
+      } catch (error) {
+        console.error('Failed to load API keys:', error);
+        setError('Failed to load API keys');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadKeys();
   }, []);
 
-  const loadApiKeys = async () => {
-    try {
-      setIsLoading(true);
-      const keys = await getApiKeys();
-      setApiKeys(keys);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load API keys');
-    } finally {
-      setIsLoading(false);
+  const toggleKeyVisibility = (keyId: string) => {
+    const newVisible = new Set(visibleKeys);
+    if (newVisible.has(keyId)) {
+      newVisible.delete(keyId);
+    } else {
+      newVisible.add(keyId);
     }
+    setVisibleKeys(newVisible);
   };
 
   const handleCreateKey = async () => {
     if (!newKeyName.trim()) {
-      setError('Name is required');
+      setError('Key name is required');
       return;
     }
 
+    setIsCreating(true);
+    setError(null);
+
     try {
-      setIsCreating(true);
-      setError(null);
-      const response = await createApiKey({ name: newKeyName.trim() });
-      setNewKeyData({ key: response.key, name: response.name });
+      const request: CreateApiKeyRequest = {
+        name: newKeyName.trim(),
+      };
+      const response = await createApiKey(request);
+      setGeneratedKey(response.key);
       setNewKeyName('');
-      await loadApiKeys();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create API key');
+      
+      // Reload keys list
+      const apiKeys = await getApiKeys();
+      setKeys(apiKeys);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create API key');
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleRevokeKey = async () => {
-    if (!keyToRevoke) return;
-
+  const handleRevokeKey = async (keyId: string) => {
     try {
-      setIsRevoking(true);
-      setError(null);
-      await revokeApiKey(keyToRevoke.id);
-      setIsRevokeModalOpen(false);
-      setKeyToRevoke(null);
-      await loadApiKeys();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke API key');
-    } finally {
-      setIsRevoking(false);
+      await revokeApiKey(keyId);
+      const apiKeys = await getApiKeys();
+      setKeys(apiKeys);
+    } catch (err: any) {
+      setError(err.message || 'Failed to revoke API key');
     }
   };
 
-  const handleCopyKey = async (key: string) => {
-    try {
-      await navigator.clipboard.writeText(key);
-      // You could add a toast notification here
-    } catch (err) {
-      setError('Failed to copy key to clipboard');
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const getKeyDisplay = (key: ApiKey) => {
+    const isVisible = visibleKeys.has(key.id);
+    if (isVisible) {
+      // In a real app, you'd store the full key when it's created
+      return `${key.keyPrefix}•••••••••••••••••`;
     }
+    return `${key.keyPrefix}•••••••••••••••••`;
   };
 
-  const getKeyStatus = (key: ApiKey): { label: string; variant: 'default' | 'accent' | 'accent2' | 'muted' } => {
-    if (key.expiresAt) {
-      const expiresAt = new Date(key.expiresAt);
-      const now = new Date();
-      if (expiresAt < now) {
-        return { label: 'Expired', variant: 'accent2' };
-      }
-      return { label: 'Active', variant: 'accent2' };
-    }
-    return { label: 'Active', variant: 'accent2' };
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const handleCloseCreateModal = () => {
-    setIsCreateModalOpen(false);
-    setNewKeyName('');
-    setNewKeyData(null);
-    setError(null);
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-bg-ui-30 rounded animate-pulse" />
+        <div className="h-64 bg-bg-ui-30 rounded animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-fg">API Keys</h1>
-          <p className="text-sm text-fg-muted mt-1">Manage your API keys for programmatic access</p>
+          <h2 className="text-2xl font-semibold text-fg">API Keys</h2>
+          <p className="text-sm text-fg-muted mt-1">
+            Manage API keys for programmatic access
+          </p>
         </div>
         <Button
+          size="sm"
           variant="primary"
-          onClick={() => setIsCreateModalOpen(true)}
-          aria-label="Create new API key"
+          className="gap-2"
+          onClick={() => setShowCreateModal(true)}
         >
+          <Plus className="h-4 w-4" />
           Create API Key
         </Button>
       </div>
 
-      {error && (
-        <Card variant="bordered" className="border-accent-30 bg-accent-10">
-          <CardContent className="p-4">
-            <p className="text-sm text-accent">{error}</p>
-          </CardContent>
+      {/* Warning */}
+      <Card variant="bordered" className="p-4 bg-accent-10 border-accent-30">
+        <div className="flex gap-3">
+          <AlertCircle className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-fg">Keep your API keys secure</p>
+            <p className="text-sm text-fg-muted">
+              API keys provide full access to your account. Never share them publicly or commit them to version control.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {error && !showCreateModal && (
+        <Card variant="bordered" className="p-4 bg-accent-10 border-accent-30">
+          <p className="text-sm text-accent">{error}</p>
         </Card>
       )}
 
-      {/* API Keys Table */}
-      <Card variant="bordered" className="overflow-hidden">
-        {isLoading ? (
-          <CardContent className="p-8">
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        ) : apiKeys.length === 0 ? (
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-16 px-6" role="status" aria-live="polite">
-              <svg
-                className="w-12 h-12 text-fg-muted mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                />
-              </svg>
-              <p className="text-sm font-medium text-fg-muted mb-4">No API keys found</p>
-              <Button
-                variant="primary"
-                onClick={() => setIsCreateModalOpen(true)}
-                aria-label="Create your first API key"
-              >
-                Create your first API key
-              </Button>
-            </div>
-          </CardContent>
-        ) : (
-          <div className="overflow-auto">
-            <Table role="table" aria-label="API keys">
-              <TableHeader>
-                <TableRow hover={false}>
-                  <TableHead className="min-w-[200px] text-xs font-semibold text-fg-muted uppercase tracking-wider" scope="col">
-                    Name
-                  </TableHead>
-                  <TableHead className="min-w-[150px] text-xs font-semibold text-fg-muted uppercase tracking-wider" scope="col">
-                    Prefix
-                  </TableHead>
-                  <TableHead className="min-w-[180px] text-xs font-semibold text-fg-muted uppercase tracking-wider" scope="col">
-                    Created At
-                  </TableHead>
-                  <TableHead className="min-w-[180px] text-xs font-semibold text-fg-muted uppercase tracking-wider" scope="col">
-                    Last Used At
-                  </TableHead>
-                  <TableHead className="min-w-[100px] text-xs font-semibold text-fg-muted uppercase tracking-wider" scope="col">
-                    Status
-                  </TableHead>
-                  <TableHead className="min-w-[80px] text-xs font-semibold text-fg-muted uppercase tracking-wider text-right" scope="col">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {apiKeys.map((key) => {
-                  const status = getKeyStatus(key);
-                  return (
-                    <TableRow key={key.id}>
-                      <TableCell className="font-medium text-fg">{key.name}</TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-bg-ui-30 px-2 py-1 rounded text-fg font-mono">
-                          {key.keyPrefix}...
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card variant="bordered" className="p-4 border-border">
+          <p className="text-sm text-fg-muted">Total Keys</p>
+          <p className="text-2xl font-semibold mt-1 text-fg">{keys.length}</p>
+        </Card>
+        <Card variant="bordered" className="p-4 border-border">
+          <p className="text-sm text-fg-muted">Active Keys</p>
+          <p className="text-2xl font-semibold mt-1 text-fg">
+            {keys.filter(k => !k.expiresAt || new Date(k.expiresAt) > new Date()).length}
+          </p>
+        </Card>
+        <Card variant="bordered" className="p-4 border-border">
+          <p className="text-sm text-fg-muted">Last Used</p>
+          <p className="text-sm font-medium mt-1 text-fg">
+            {keys.find(k => k.lastUsedAt) 
+              ? new Date(keys.find(k => k.lastUsedAt)!.lastUsedAt!).toLocaleString()
+              : 'Never'
+            }
+          </p>
+        </Card>
+      </div>
+
+      {/* Table */}
+      <Card variant="bordered" className="overflow-hidden border-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead>Name</TableHead>
+              <TableHead>API Key</TableHead>
+              <TableHead>Permissions</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Last Used</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[100px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {keys.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-fg-muted py-8">
+                  No API keys found. Create your first API key to get started.
+                </TableCell>
+              </TableRow>
+            ) : (
+              keys.map((key) => {
+                const isVisible = visibleKeys.has(key.id);
+                const isExpired = key.expiresAt && new Date(key.expiresAt) < new Date();
+                return (
+                  <TableRow key={key.id} className="border-border">
+                    <TableCell className="font-medium text-fg">{key.name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-accent-10 px-2 py-1 rounded font-mono text-accent">
+                          {getKeyDisplay(key)}
                         </code>
-                      </TableCell>
-                      <TableCell className="text-fg-muted">{formatDate(key.createdAt)}</TableCell>
-                      <TableCell className="text-fg-muted">{formatDate(key.lastUsedAt)}</TableCell>
-                      <TableCell>
-                        <Badge variant={status.variant} size="sm">
-                          {status.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu
-                          trigger={
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`Actions for API key ${key.name}`}
-                            >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                                />
-                              </svg>
-                            </Button>
-                          }
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => toggleKeyVisibility(key.id)}
                         >
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setKeyToRevoke(key);
-                              setIsRevokeModalOpen(true);
-                            }}
-                            className="text-accent"
-                          >
-                            Revoke Key
-                          </DropdownMenuItem>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                          {isVisible ? (
+                            <EyeOff className="h-3 w-3" />
+                          ) : (
+                            <Eye className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => copyToClipboard(key.keyPrefix)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Badge variant="default" className="text-xs border-border">
+                          read
+                        </Badge>
+                        <Badge variant="default" className="text-xs border-border">
+                          write
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-fg-muted">
+                      {new Date(key.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-sm text-fg-muted">
+                      {key.lastUsedAt
+                        ? new Date(key.lastUsedAt).toLocaleString()
+                        : 'Never'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="default"
+                        className={
+                          isExpired
+                            ? 'border-gray-500/30 bg-gray-500/10 text-gray-500'
+                            : 'border-semantic-success/30 bg-semantic-success/10 text-semantic-success'
+                        }
+                      >
+                        {isExpired ? 'revoked' : 'active'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-500 hover:text-red-500"
+                        onClick={() => handleRevokeKey(key.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
       </Card>
 
-      {/* Create API Key Modal */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={handleCloseCreateModal}
-        title={newKeyData ? 'API Key Created' : 'Create API Key'}
-        size="md"
-      >
-        {newKeyData ? (
-          <div className="space-y-4">
-            <Card variant="bordered" className="border-accent-30 bg-accent-10">
-              <CardContent className="p-4">
-                <p className="text-sm text-fg font-medium mb-2">⚠️ Important: Save this key now</p>
-                <p className="text-xs text-fg-muted">
-                  You won't be able to see this key again. Make sure to copy it and store it securely.
-                </p>
-              </CardContent>
-            </Card>
-            <div>
-              <label className="block text-sm font-medium text-fg mb-2">API Key</label>
-              <Card variant="bordered" className="overflow-hidden">
-                <div className="bg-bg-ui-30 px-4 py-2 text-sm font-medium text-fg-muted">
-                  API Key
+      {/* Create Key Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="bg-bg-card border-border">
+          {!generatedKey ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Create New API Key</DialogTitle>
+                <DialogDescription>
+                  Give your API key a descriptive name to help you identify it later.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="key-name">Key Name</Label>
+                  <Input
+                    id="key-name"
+                    placeholder="e.g., Production Server"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    className="bg-bg-card border-border"
+                  />
                 </div>
-                <div className="p-4 bg-bg-card">
-                  <div className="flex gap-2 items-center">
-                    <code className="flex-1 text-sm text-fg font-mono break-all">
-                      {newKeyData.key}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopyKey(newKeyData.key)}
-                      aria-label="Copy API key to clipboard"
-                    >
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                        />
-                      </svg>
-                      Copy
-                    </Button>
+                <div className="space-y-2">
+                  <Label>Permissions</Label>
+                  <div className="flex gap-2">
+                    <Badge variant="default" className="cursor-pointer border-accent bg-accent-10 text-accent">
+                      Read
+                    </Badge>
+                    <Badge variant="default" className="cursor-pointer border-accent bg-accent-10 text-accent">
+                      Write
+                    </Badge>
                   </div>
                 </div>
-              </Card>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={handleCloseCreateModal}
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="key-name" className="block text-sm font-medium text-fg mb-2">
-                Name
-              </label>
-              <Input
-                id="key-name"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder="e.g., Production API Key"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCreateKey();
-                  }
-                }}
-              />
-              <p className="mt-1 text-xs text-fg-muted">
-                Give your API key a descriptive name to identify it later
-              </p>
-            </div>
-            {error && (
-              <Card variant="bordered" className="border-accent-30 bg-accent-10">
-                <CardContent className="p-3">
-                  <p className="text-sm text-accent">{error}</p>
-                </CardContent>
-              </Card>
-            )}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={handleCloseCreateModal}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCreateKey}
-                disabled={isCreating}
-              >
-                {isCreating && (
-                  <svg
-                    className="mr-2 h-4 w-4 animate-spin"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                )}
-                {isCreating ? 'Creating...' : 'Create Key'}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Revoke Confirmation Modal */}
-      <Modal
-        isOpen={isRevokeModalOpen}
-        onClose={() => {
-          setIsRevokeModalOpen(false);
-          setKeyToRevoke(null);
-          setError(null);
-        }}
-        title="Revoke API Key"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-fg">
-            Are you sure you want to revoke the API key <strong>{keyToRevoke?.name}</strong>?
-          </p>
-          <p className="text-xs text-fg-muted">
-            This action cannot be undone. Any applications using this key will stop working immediately.
-          </p>
-          {error && (
-            <Card variant="bordered" className="border-accent-30 bg-accent-10">
-              <CardContent className="p-3">
-                <p className="text-sm text-accent">{error}</p>
-              </CardContent>
-            </Card>
+                {error && <p className="text-sm text-accent">{error}</p>}
+              </div>
+              <DialogFooter>
+                <Button variant="secondary" onClick={() => {
+                  setShowCreateModal(false);
+                  setError(null);
+                  setNewKeyName('');
+                }}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={handleCreateKey} disabled={isCreating} loading={isCreating}>
+                  Create Key
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>API Key Created</DialogTitle>
+                <DialogDescription>
+                  Make sure to copy your API key now. You won't be able to see it again!
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <Card variant="bordered" className="p-4 bg-accent-10 border-border">
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="text-sm font-mono break-all text-fg">{generatedKey}</code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(generatedKey)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
+                <div className="rounded-lg bg-accent-10 border border-accent-30 p-3">
+                  <div className="flex gap-2">
+                    <AlertCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-fg-muted">
+                      Store this key securely. It provides full access to your account and cannot be recovered.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="primary" onClick={() => {
+                  setShowCreateModal(false);
+                  setGeneratedKey(null);
+                  setNewKeyName('');
+                  setError(null);
+                }}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </>
           )}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsRevokeModalOpen(false);
-                setKeyToRevoke(null);
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="accent2"
-              onClick={handleRevokeKey}
-              disabled={isRevoking}
-            >
-              {isRevoking && (
-                <svg
-                  className="mr-2 h-4 w-4 animate-spin"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-              )}
-              {isRevoking ? 'Revoking...' : 'Revoke Key'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

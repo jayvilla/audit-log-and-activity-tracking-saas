@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation';
 import { login, getMe } from '../../../lib/api-client';
 import { usePageTitle } from '../../../lib/use-page-title';
 import {
+  Button,
+  Input,
+  Label,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-  Button,
-  Input,
+  Separator,
 } from '@audit-log-and-activity-tracking-saas/ui';
+import { Chrome } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 export default function LoginPage() {
@@ -41,8 +44,8 @@ export default function LoginPage() {
         throw new Error('Login verification failed');
       }
 
-      // Redirect to audit-logs on success
-      router.push('/audit-logs');
+      // Redirect to overview on success
+      router.push('/overview');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -51,122 +54,152 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg px-4 py-12">
-      <div className="w-full max-w-md">
-        <Card variant="bordered">
-          <CardHeader className="text-center space-y-2 pb-6">
-            <CardTitle className="text-2xl font-semibold text-fg">
-              Welcome Back
-            </CardTitle>
-            <CardDescription className="text-fg-muted">
-              Sign in to your account
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-5">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-fg"
-                >
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  error={!!error}
-                  placeholder="admin@example.com"
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-fg"
-                >
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  error={!!error}
-                  placeholder="Enter your password"
-                  className="h-11"
-                />
-              </div>
-
-              {error && (
-                <div
-                  className={cn(
-                    'bg-accent-10 border border-accent-30 text-accent',
-                    'px-4 py-3 rounded-md text-sm',
-                    'flex items-center gap-2'
-                  )}
-                >
-                  <svg
-                    className="h-4 w-4 flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                disabled={isLoading}
-                loading={isLoading}
-                className="w-full"
+    <div className="min-h-screen flex items-center justify-center bg-bg p-6">
+      <Card variant="bordered" className="w-full max-w-md p-8">
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="h-5 w-5 text-fg-on-accent"
               >
-                Sign In
-              </Button>
-            </form>
+                <path
+                  d="M12 2L2 7L12 12L22 7L12 2Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 17L12 22L22 17"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M2 12L12 17L22 12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <span className="text-xl font-semibold text-fg">AuditLog</span>
+          </div>
+        </div>
 
-            {marketingUrl && (
-              <div className="pt-4 border-t border-border">
-                <a
-                  href={marketingUrl}
-                  className="text-sm text-fg-muted hover:text-fg transition-colors flex items-center justify-center gap-1.5"
+        {/* Header */}
+        <CardHeader className="text-center pb-6">
+          <CardTitle className="text-2xl font-semibold text-fg">Welcome back</CardTitle>
+          <CardDescription className="text-fg-muted">
+            Sign in to your account to continue
+          </CardDescription>
+        </CardHeader>
+
+        {/* Form */}
+        <CardContent className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@company.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-bg-card border-border"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  className="text-xs text-accent hover:underline"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
-                  </svg>
-                  Back to home
-                </a>
+                  Forgot password?
+                </button>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-bg-card border-border"
+              />
+            </div>
+
+            {error && (
+              <div
+                className={cn(
+                  'bg-accent-10 border border-accent-30 text-accent',
+                  'px-4 py-3 rounded-md text-sm',
+                  'flex items-center gap-2'
+                )}
+              >
+                <svg
+                  className="h-4 w-4 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>{error}</span>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+
+            <Button type="submit" variant="primary" className="w-full" disabled={isLoading} loading={isLoading}>
+              Sign in
+            </Button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <Separator className="bg-border" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-card px-2 text-xs text-fg-muted">
+              or continue with
+            </span>
+          </div>
+
+          {/* Social login */}
+          <Button variant="secondary" className="w-full gap-2 border-border hover:bg-bg-card">
+            <Chrome className="h-4 w-4" />
+            Sign in with Google
+          </Button>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-fg-muted mt-8">
+            Don't have an account?{' '}
+            <a
+              href={`${marketingUrl}/pricing`}
+              className="text-accent hover:underline"
+            >
+              Contact sales
+            </a>
+          </p>
+
+          {/* Security notice */}
+          <div className="mt-8 p-3 rounded-lg bg-accent-10 border border-border">
+            <p className="text-xs text-fg-muted text-center">
+              Protected by 256-bit SSL encryption and 2FA
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
