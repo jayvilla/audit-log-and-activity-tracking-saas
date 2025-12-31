@@ -185,10 +185,10 @@ export default function LoginPage() {
           <p className="text-center text-xs text-fg-muted mt-8">
             Don't have an account?{' '}
             <a
-              href={`${marketingUrl}/pricing`}
+              href="/sign-up"
               className="text-accent hover:underline"
             >
-              Contact sales
+              Sign up now
             </a>
           </p>
 

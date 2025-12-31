@@ -102,6 +102,35 @@ export async function getMeServer(cookieHeader?: string): Promise<{ user: any } 
 }
 
 /**
+ * Register a new user
+ */
+export async function register(
+  email: string,
+  password: string,
+  name: string
+): Promise<{ user: any; sessionToken: string }> {
+  // First, get CSRF token
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+    body: JSON.stringify({ email, password, name }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Registration failed' }));
+    throw new Error(error.message || 'Registration failed');
+  }
+
+  return response.json();
+}
+
+/**
  * Logout current user
  */
 export async function logout(): Promise<void> {
