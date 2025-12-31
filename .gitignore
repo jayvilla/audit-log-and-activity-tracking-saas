@@ -50,3 +50,6 @@ out
 .env
 .env.local
 .env.*.local
+
+# Internal/audit documents
+MVP_READINESS_CHECKLIST.md
