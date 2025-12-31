@@ -14,6 +14,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiOkResponse } from '@nestjs/swagg
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { AuthGuard } from './auth.guard';
 import { CsrfGuard } from './csrf.guard';
 import { CsrfService } from './csrf.service';
@@ -58,6 +59,41 @@ export class AuthController {
     });
 
     return res.json({ token });
+  }
+
+  @Post('register')
+  @UseGuards(CsrfGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register new user' })
+  @ApiOkResponse({ description: 'Registration successful' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  @ApiResponse({ status: 403, description: 'Invalid CSRF token' })
+  async register(@Body() registerDto: RegisterDto, @Req() req: Request) {
+    const { user, organization } = await this.authService.register(
+      registerDto.email,
+      registerDto.password,
+      registerDto.name,
+    );
+
+    // Store session data
+    req.session.userId = user.id;
+    req.session.orgId = user.orgId;
+    req.session.role = user.role;
+
+    // Return user data (without password hash)
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        orgId: user.orgId,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      sessionToken: 'session-set-via-cookie', // Session is set via cookie, this is just for API contract
+    };
   }
 
   @Post('login')
