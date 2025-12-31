@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { login, getMe } from '../../../lib/api-client';
 import { usePageTitle } from '../../../lib/use-page-title';
 import {
@@ -22,6 +22,7 @@ export default function LoginPage() {
   usePageTitle('Sign In');
   
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +45,13 @@ export default function LoginPage() {
         throw new Error('Login verification failed');
       }
 
-      // Redirect to overview on success
-      router.push('/overview');
+      // Redirect to redirectTo parameter if present, otherwise default to overview
+      // Ensure redirectTo is a safe internal path (starts with / and doesn't contain // or ://)
+      const redirectToParam = searchParams.get('redirectTo');
+      const redirectTo = redirectToParam && redirectToParam.startsWith('/') && !redirectToParam.includes('//') && !redirectToParam.includes('://')
+        ? redirectToParam
+        : '/overview';
+      router.push(redirectTo);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
