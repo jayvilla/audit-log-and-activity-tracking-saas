@@ -1,22 +1,53 @@
 :root {
-  /* Linear.app-inspired dark-first theme */
-  --bg: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --muted-2: 240 3.7% 15.9%; /* Slightly lighter muted variant */
-  --border: 240 3.7% 15.9%;
-  --card: 240 5.5% 8.5%;
-  --card-foreground: 0 0% 98%;
-  --card-2: 240 5.5% 12.2%; /* Slightly lighter card variant */
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --accent2: 217 91% 60%;
-  --accent2-foreground: 0 0% 98%;
+  /* Backgrounds */
+  --bg: #0a0a0a;
+  --bg-overlay: rgba(10, 10, 10, 0.8);
+  --bg-card: rgba(24, 24, 27, 0.5);
+  --bg-gradient-from: #0a0a0a;
+  --bg-gradient-to: #27272a;
   
-  /* Subtle gradients for premium feel */
-  --gradient-from: 240 10% 3.9%;
-  --gradient-via: 240 5.5% 8.5%;
-  --gradient-to: 240 3.7% 15.9%;
+  /* UI Element Backgrounds (skeleton/placeholder) */
+  --bg-ui-50: rgba(39, 39, 42, 0.5);
+  --bg-ui-40: rgba(39, 39, 42, 0.4);
+  --bg-ui-30: rgba(39, 39, 42, 0.3);
+  --bg-ui-20: rgba(39, 39, 42, 0.2);
+  
+  /* Foreground/Text */
+  --fg: #e4e4e7;
+  --fg-muted: #a1a1aa;
+  --fg-on-accent: #ffffff;
+  
+  /* Borders */
+  --border: #27272a;
+  --border-transparent: rgba(0, 0, 0, 0);
+  
+  /* Accent/Primary */
+  --accent: #8b5cf6;
+  --accent-10: rgba(139, 92, 246, 0.1);
+  --accent-30: rgba(139, 92, 246, 0.3);
+  --accent-05: rgba(139, 92, 246, 0.05);
+  
+  /* Semantic Colors */
+  --semantic-success: #00c950;
+  --semantic-info: #2b7fff;
+  --semantic-purple: #ad46ff;
+  
+  /* Spacing Scale */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 33554400px; /* Very large for pill shapes */
+  
+  /* Shadows */
+  --shadow-accent: 0px 25px 50px -12px rgba(139, 92, 246, 0.05);
 }
-

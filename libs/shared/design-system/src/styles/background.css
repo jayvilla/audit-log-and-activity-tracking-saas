@@ -1,67 +1,25 @@
-/* Linear-style grid/noise background effect */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
+/* Background effects from Figma design */
+
+/* Gradient background (used in Hero section) */
+.bg-gradient-hero {
+  background: linear-gradient(to right, var(--bg-gradient-from), var(--bg-gradient-to));
+}
+
+/* Radial gradient overlays (from Figma Hero section) */
+.bg-gradient-radial-purple {
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 20px 20px;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.5;
+    radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, rgba(0, 0, 0, 0) 50%);
 }
 
-/* Subtle noise texture overlay */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: 
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.015) 1px, transparent 0);
-  background-size: 20px 20px;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.4;
-  animation: noise 8s steps(10) infinite;
+.bg-gradient-radial-blue {
+  background-image: 
+    radial-gradient(circle, rgba(99, 102, 241, 0.06) 0%, rgba(0, 0, 0, 0) 50%);
 }
 
-@keyframes noise {
-  0%, 100% {
-    transform: translate(0, 0);
-  }
-  10% {
-    transform: translate(-5%, -5%);
-  }
-  20% {
-    transform: translate(-10%, 5%);
-  }
-  30% {
-    transform: translate(5%, -10%);
-  }
-  40% {
-    transform: translate(-5%, 15%);
-  }
-  50% {
-    transform: translate(-10%, 5%);
-  }
-  60% {
-    transform: translate(15%, 0%);
-  }
-  70% {
-    transform: translate(0%, 10%);
-  }
-  80% {
-    transform: translate(-15%, 0%);
-  }
-  90% {
-    transform: translate(10%, 5%);
-  }
+/* Subtle grid/noise overlay (from Figma - opacity 0.015) */
+.bg-overlay-grid {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.015) 0%, rgba(0, 0, 0, 0) 0%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0%, rgba(0, 0, 0, 0) 0%);
+  opacity: 0.015;
 }
-
-/* Ensure content is above background effects */
-main {
-  position: relative;
-  z-index: 1;
-}
-
