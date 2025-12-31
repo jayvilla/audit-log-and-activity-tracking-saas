@@ -365,3 +365,42 @@ export async function revokeApiKey(id: string): Promise<void> {
   }
 }
 
+/**
+ * Overview metrics types
+ */
+export interface OverviewMetrics {
+  eventsToday: number;
+  eventsTodayChange: number;
+  activeUsers: number;
+  activeUsersChange: number;
+  successRate: number;
+  avgResponseTime: number;
+  eventActivityLast7Days: Array<{ date: string; events: number }>;
+  topActions: Array<{ action: string; count: number }>;
+  recentActivity: Array<{
+    id: string;
+    actor: string | null;
+    action: string;
+    resourceType: string;
+    createdAt: string;
+    status: 'success' | 'failure';
+  }>;
+}
+
+/**
+ * Get overview metrics for the dashboard
+ */
+export async function getOverviewMetrics(): Promise<OverviewMetrics> {
+  const response = await fetch(`${API_URL}/v1/audit-events/overview`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch overview metrics');
+  }
+
+  return response.json();
+}
+

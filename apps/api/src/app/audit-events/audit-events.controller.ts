@@ -19,8 +19,12 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { UserRole } from '../../entities/user.entity';
 import { RateLimiterService } from '../api-key/rate-limiter.service';
 import { AuditEventsService } from './audit-events.service';
+import { DemoSeedingService } from './demo-seeding.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserEntity } from '../../entities/user.entity';
 
 @ApiTags('audit-events')
 @Controller('v1/audit-events')
@@ -28,6 +32,9 @@ export class AuditEventsController {
   constructor(
     private readonly auditEventsService: AuditEventsService,
     private readonly rateLimiterService: RateLimiterService,
+    private readonly demoSeedingService: DemoSeedingService,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
   ) {}
 
   @Post()
@@ -130,7 +137,12 @@ export class AuditEventsController {
       throw new UnauthorizedException('Session data missing');
     }
 
-    return this.auditEventsService.getAuditEvents(orgId, userId, role, query);
+    // Get user email for demo data filtering
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    return this.auditEventsService.getAuditEvents(orgId, userId, role, query, user?.email);
   }
 
   @Get('export.json')
@@ -173,7 +185,12 @@ export class AuditEventsController {
       throw new UnauthorizedException('Session data missing');
     }
 
-    const data = await this.auditEventsService.exportAsJson(orgId, userId, role, query);
+    // Get user email for demo data filtering
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    const data = await this.auditEventsService.exportAsJson(orgId, userId, role, query, user?.email);
     return data;
   }
 
@@ -207,12 +224,17 @@ export class AuditEventsController {
       throw new UnauthorizedException('Session data missing');
     }
 
+    // Get user email for demo data filtering
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
     // Set headers for CSV download
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="audit-events-${new Date().toISOString().split('T')[0]}.csv"`);
 
     // Get the stream from service and pipe to response
-    const stream = await this.auditEventsService.exportAsCsvStream(orgId, userId, role, query);
+    const stream = await this.auditEventsService.exportAsCsvStream(orgId, userId, role, query, user?.email);
     
     // Handle stream errors
     stream.on('error', (error) => {
@@ -225,6 +247,43 @@ export class AuditEventsController {
     });
 
     stream.pipe(res);
+  }
+
+  @Get('overview')
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Get overview metrics for dashboard' })
+  @ApiOkResponse({
+    description: 'Overview metrics retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getOverview(@Req() req: Request) {
+    const orgId = req.session.orgId;
+    const userId = req.session.userId;
+    const role = req.session.role;
+
+    if (!orgId || !userId || !role) {
+      throw new UnauthorizedException('Session data missing');
+    }
+
+    // DEMO: Check if this is admin@example.com and seed demo data if needed
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (user?.email === 'admin@example.com') {
+      // Seed demo data if needed (idempotent)
+      await this.demoSeedingService.seedDemoDataIfNeeded(user.email, orgId);
+    }
+
+    // Get metrics (pass user email for demo data filtering)
+    const metrics = await this.auditEventsService.getOverviewMetrics(
+      orgId,
+      userId,
+      role,
+      user?.email,
+    );
+
+    return metrics;
   }
 }
 

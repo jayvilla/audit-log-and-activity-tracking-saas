@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Card } from '@audit-log-and-activity-tracking-saas/ui';
 import { Activity, TrendingUp, Users, Shield } from 'lucide-react';
 import {
@@ -14,27 +15,98 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { usePageTitle } from '../../../lib/use-page-title';
+import { getOverviewMetrics, type OverviewMetrics } from '../../../lib/api-client';
 
-const activityData = [
-  { date: 'Dec 25', events: 420 },
-  { date: 'Dec 26', events: 380 },
-  { date: 'Dec 27', events: 520 },
-  { date: 'Dec 28', events: 490 },
-  { date: 'Dec 29', events: 650 },
-  { date: 'Dec 30', events: 580 },
-  { date: 'Dec 31', events: 720 },
-];
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-const actionDistribution = [
-  { action: 'user.login', count: 450 },
-  { action: 'document.updated', count: 320 },
-  { action: 'apikey.created', count: 180 },
-  { action: 'role.assigned', count: 95 },
-  { action: 'export.requested', count: 75 },
-];
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+}
 
 export default function OverviewPage() {
   usePageTitle('Overview');
+  const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchMetrics() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getOverviewMetrics();
+        setMetrics(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load overview metrics');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchMetrics();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-fg">Overview</h2>
+          <p className="text-sm text-fg-muted mt-1">
+            Your audit log activity at a glance
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <p className="text-fg-muted">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-fg">Overview</h2>
+          <p className="text-sm text-fg-muted mt-1">
+            Your audit log activity at a glance
+          </p>
+        </div>
+        <Card variant="bordered" className="p-6 border-border">
+          <p className="text-fg-muted">Error: {error}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!metrics) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-fg">Overview</h2>
+          <p className="text-sm text-fg-muted mt-1">
+            Your audit log activity at a glance
+          </p>
+        </div>
+        <Card variant="bordered" className="p-6 border-border">
+          <p className="text-fg-muted">No data available</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Format top actions for the chart (combine resourceType.action)
+  const actionDistribution = metrics.topActions.map((item) => ({
+    action: item.action,
+    count: item.count,
+  }));
 
   return (
     <div className="space-y-6">
@@ -56,11 +128,15 @@ export default function OverviewPage() {
             <div>
               <p className="text-sm text-fg-muted">Events Today</p>
               <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-semibold text-fg">720</p>
-                <span className="text-xs text-semantic-success flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  12%
-                </span>
+                <p className="text-2xl font-semibold text-fg">{metrics.eventsToday.toLocaleString()}</p>
+                {metrics.eventsTodayChange !== 0 && (
+                  <span className={`text-xs flex items-center gap-1 ${
+                    metrics.eventsTodayChange > 0 ? 'text-semantic-success' : 'text-red-500'
+                  }`}>
+                    <TrendingUp className="h-3 w-3" />
+                    {Math.abs(metrics.eventsTodayChange)}%
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -74,11 +150,15 @@ export default function OverviewPage() {
             <div>
               <p className="text-sm text-fg-muted">Active Users</p>
               <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-semibold text-fg">247</p>
-                <span className="text-xs text-semantic-success flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  8%
-                </span>
+                <p className="text-2xl font-semibold text-fg">{metrics.activeUsers.toLocaleString()}</p>
+                {metrics.activeUsersChange !== 0 && (
+                  <span className={`text-xs flex items-center gap-1 ${
+                    metrics.activeUsersChange > 0 ? 'text-semantic-success' : 'text-red-500'
+                  }`}>
+                    <TrendingUp className="h-3 w-3" />
+                    {Math.abs(metrics.activeUsersChange)}%
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -91,7 +171,7 @@ export default function OverviewPage() {
             </div>
             <div>
               <p className="text-sm text-fg-muted">Success Rate</p>
-              <p className="text-2xl font-semibold text-fg">99.7%</p>
+              <p className="text-2xl font-semibold text-fg">{metrics.successRate.toFixed(1)}%</p>
             </div>
           </div>
         </Card>
@@ -103,7 +183,7 @@ export default function OverviewPage() {
             </div>
             <div>
               <p className="text-sm text-fg-muted">Avg Response</p>
-              <p className="text-2xl font-semibold text-fg">45ms</p>
+              <p className="text-2xl font-semibold text-fg">{metrics.avgResponseTime}ms</p>
             </div>
           </div>
         </Card>
@@ -117,7 +197,7 @@ export default function OverviewPage() {
             <p className="text-sm text-fg-muted">Last 7 days</p>
           </div>
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={activityData}>
+            <AreaChart data={metrics.eventActivityLast7Days}>
               <defs>
                 <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -203,29 +283,27 @@ export default function OverviewPage() {
           <p className="text-sm text-fg-muted">Latest audit events</p>
         </div>
         <div className="space-y-3">
-          {[
-            { actor: 'Sarah Johnson', action: 'user.login', time: '2 minutes ago', status: 'success' },
-            { actor: 'Michael Chen', action: 'document.updated', time: '5 minutes ago', status: 'success' },
-            { actor: 'Emily Davis', action: 'apikey.created', time: '12 minutes ago', status: 'success' },
-            { actor: 'David Wilson', action: 'user.password_reset', time: '18 minutes ago', status: 'failure' },
-            { actor: 'Lisa Anderson', action: 'webhook.triggered', time: '23 minutes ago', status: 'success' },
-          ].map((event, i) => (
-            <div 
-              key={i} 
-              className="flex items-center justify-between py-3 border-b border-border last:border-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`h-2 w-2 rounded-full ${
-                  event.status === 'success' ? 'bg-semantic-success' : 'bg-red-500'
-                }`} />
-                <div>
-                  <p className="text-sm font-medium text-fg">{event.actor}</p>
-                  <code className="text-xs text-fg-muted">{event.action}</code>
+          {metrics.recentActivity.length === 0 ? (
+            <p className="text-sm text-fg-muted py-4 text-center">No recent activity</p>
+          ) : (
+            metrics.recentActivity.map((event) => (
+              <div 
+                key={event.id} 
+                className="flex items-center justify-between py-3 border-b border-border last:border-0"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`h-2 w-2 rounded-full ${
+                    event.status === 'success' ? 'bg-semantic-success' : 'bg-red-500'
+                  }`} />
+                  <div>
+                    <p className="text-sm font-medium text-fg">{event.actor || 'Unknown'}</p>
+                    <code className="text-xs text-fg-muted">{event.action}</code>
+                  </div>
                 </div>
+                <p className="text-xs text-fg-muted">{formatTimeAgo(event.createdAt)}</p>
               </div>
-              <p className="text-xs text-fg-muted">{event.time}</p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
     </div>

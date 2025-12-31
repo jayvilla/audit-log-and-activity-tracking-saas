@@ -1,7 +1,8 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThanOrEqual, LessThanOrEqual, ILike } from 'typeorm';
+import { Repository, LessThan, MoreThanOrEqual, LessThanOrEqual, ILike, In } from 'typeorm';
 import { AuditEventEntity, ActorType } from '../../entities/audit-event.entity';
+import { UserEntity } from '../../entities/user.entity';
 import type { CreateAuditEventRequest } from '@audit-log-and-activity-tracking-saas/types';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
 import { Readable } from 'stream';
@@ -17,6 +18,8 @@ export class AuditEventsService {
   constructor(
     @InjectRepository(AuditEventEntity)
     private readonly auditEventRepository: Repository<AuditEventEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     @Inject(forwardRef(() => WebhooksService))
     private readonly webhooksService: WebhooksService,
   ) {}
@@ -86,6 +89,7 @@ export class AuditEventsService {
     userId: string,
     userRole: string,
     query: GetAuditEventsDto,
+    userEmail?: string,
   ): Promise<{
     data: Array<{
       id: string;
@@ -105,7 +109,9 @@ export class AuditEventsService {
     };
   }> {
     const limit = Math.min(query.limit || 50, 100);
-    const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, query);
+    // DEMO: Exclude demo data unless user is admin@example.com
+    const excludeDemo = userEmail !== 'admin@example.com';
+    const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, query, excludeDemo, userEmail);
 
     // Parse cursor for pagination
     let cursor: Cursor | null = null;
@@ -171,12 +177,15 @@ export class AuditEventsService {
 
   /**
    * Builds a query builder with filters applied (reused by export methods)
+   * @param excludeDemoData - If true, excludes events with metadata.demo = true (unless user is admin@example.com)
    */
   private buildFilteredQuery(
     orgId: string,
     userId: string,
     userRole: string,
     query: GetAuditEventsDto,
+    excludeDemoData: boolean = false,
+    userEmail?: string,
   ) {
     const queryBuilder = this.auditEventRepository
       .createQueryBuilder('audit_event')
@@ -189,6 +198,13 @@ export class AuditEventsService {
         actorType: ActorType.USER,
       });
       queryBuilder.andWhere('audit_event.actorId = :userId', { userId });
+    }
+
+    // DEMO: Exclude demo data from exports unless user is admin@example.com
+    if (excludeDemoData && userEmail !== 'admin@example.com') {
+      queryBuilder.andWhere(
+        "(audit_event.metadata->>'demo' IS NULL OR audit_event.metadata->>'demo' != 'true')",
+      );
     }
 
     // Apply filters
@@ -253,12 +269,14 @@ export class AuditEventsService {
 
   /**
    * Export audit events as JSON (all results, no pagination)
+   * DEMO: Excludes demo data unless user is admin@example.com
    */
   async exportAsJson(
     orgId: string,
     userId: string,
     userRole: string,
     query: GetAuditEventsDto,
+    userEmail?: string,
   ): Promise<Array<{
     id: string;
     orgId: string;
@@ -272,7 +290,7 @@ export class AuditEventsService {
     userAgent: string | null;
     createdAt: string;
   }>> {
-    const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, query);
+    const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, query, true, userEmail);
     const events = await queryBuilder.getMany();
 
     return events.map((event) => ({
@@ -292,12 +310,14 @@ export class AuditEventsService {
 
   /**
    * Export audit events as CSV stream (streams results in chunks without loading all into memory)
+   * DEMO: Excludes demo data unless user is admin@example.com
    */
   async exportAsCsvStream(
     orgId: string,
     userId: string,
     userRole: string,
     query: GetAuditEventsDto,
+    userEmail?: string,
   ): Promise<Readable> {
     // Create a readable stream (not in object mode, pushes strings)
     const stream = new Readable({
@@ -345,7 +365,7 @@ export class AuditEventsService {
       try {
         while (hasMore) {
           // Build query for this batch
-          const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, query);
+          const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, query, true, userEmail);
 
           // Apply cursor pagination if we have one
           if (lastCursor) {
@@ -409,6 +429,220 @@ export class AuditEventsService {
     })();
 
     return stream;
+  }
+
+  /**
+   * Get overview metrics for the dashboard
+   * DEMO: Includes demo data only for admin@example.com
+   */
+  async getOverviewMetrics(
+    orgId: string,
+    userId: string,
+    userRole: string,
+    userEmail?: string,
+  ): Promise<{
+    eventsToday: number;
+    eventsTodayChange: number; // Percentage change from yesterday
+    activeUsers: number;
+    activeUsersChange: number; // Percentage change
+    successRate: number; // Percentage (0-100)
+    avgResponseTime: number; // Milliseconds
+    eventActivityLast7Days: Array<{ date: string; events: number }>;
+    topActions: Array<{ action: string; count: number }>;
+    recentActivity: Array<{
+      id: string;
+      actor: string | null;
+      action: string;
+      resourceType: string;
+      createdAt: string;
+      status: 'success' | 'failure';
+    }>;
+  }> {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayEnd = new Date(todayStart.getTime() - 1);
+    const sevenDaysAgo = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(todayStart.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // DEMO: Exclude demo data unless user is admin@example.com
+    const excludeDemo = userEmail !== 'admin@example.com';
+
+    // Build base query with RBAC
+    const baseQuery = this.auditEventRepository
+      .createQueryBuilder('audit_event')
+      .where('audit_event.orgId = :orgId', { orgId });
+
+    if (userRole !== 'admin') {
+      baseQuery
+        .andWhere('audit_event.actorType = :actorType', { actorType: ActorType.USER })
+        .andWhere('audit_event.actorId = :userId', { userId });
+    }
+
+    // DEMO: Filter out demo data unless user is admin@example.com
+    if (excludeDemo) {
+      baseQuery.andWhere(
+        "(audit_event.metadata->>'demo' IS NULL OR audit_event.metadata->>'demo' != 'true')",
+      );
+    }
+
+    // Events today
+    const eventsToday = await baseQuery
+      .clone()
+      .andWhere('audit_event.createdAt >= :todayStart', { todayStart })
+      .getCount();
+
+    // Events yesterday (for change calculation)
+    const eventsYesterday = await baseQuery
+      .clone()
+      .andWhere('audit_event.createdAt >= :yesterdayStart', { yesterdayStart })
+      .andWhere('audit_event.createdAt <= :yesterdayEnd', { yesterdayEnd })
+      .getCount();
+
+    const eventsTodayChange =
+      eventsYesterday > 0
+        ? Math.round(((eventsToday - eventsYesterday) / eventsYesterday) * 100)
+        : eventsToday > 0
+          ? 100
+          : 0;
+
+    // Active users (distinct user actors in last 30 days)
+    const activeUsersResult = await baseQuery
+      .clone()
+      .select('COUNT(DISTINCT audit_event.actorId)', 'count')
+      .andWhere('audit_event.actorType = :actorType', { actorType: ActorType.USER })
+      .andWhere('audit_event.createdAt >= :thirtyDaysAgo', { thirtyDaysAgo })
+      .getRawOne<{ count: string }>();
+
+    const activeUsers = parseInt(activeUsersResult?.count || '0', 10);
+
+    // Active users change (compare last 30 days to previous 30 days)
+    const previous30DaysStart = new Date(thirtyDaysAgo.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const previous30DaysEnd = thirtyDaysAgo;
+
+    const previousActiveUsersResult = await baseQuery
+      .clone()
+      .select('COUNT(DISTINCT audit_event.actorId)', 'count')
+      .andWhere('audit_event.actorType = :actorType', { actorType: ActorType.USER })
+      .andWhere('audit_event.createdAt >= :previous30DaysStart', { previous30DaysStart })
+      .andWhere('audit_event.createdAt < :previous30DaysEnd', { previous30DaysEnd })
+      .getRawOne<{ count: string }>();
+
+    const previousActiveUsers = parseInt(previousActiveUsersResult?.count || '0', 10);
+    const activeUsersChange =
+      previousActiveUsers > 0
+        ? Math.round(((activeUsers - previousActiveUsers) / previousActiveUsers) * 100)
+        : activeUsers > 0
+          ? 100
+          : 0;
+
+    // Success rate (derive from metadata or default to 99.7%)
+    // For MVP, we'll use a default high success rate
+    const successRate = 99.7;
+
+    // Average response time (derive from metadata or default to 45ms)
+    // For MVP, we'll use a default
+    const avgResponseTime = 45;
+
+    // Event activity last 7 days (grouped by date)
+    const activityQuery = baseQuery
+      .clone()
+      .select("DATE_TRUNC('day', audit_event.createdAt)", 'date')
+      .addSelect('COUNT(*)', 'count')
+      .andWhere('audit_event.createdAt >= :sevenDaysAgo', { sevenDaysAgo })
+      .groupBy("DATE_TRUNC('day', audit_event.createdAt)")
+      .orderBy("DATE_TRUNC('day', audit_event.createdAt)", 'ASC');
+
+    const activityResults = await activityQuery.getRawMany<{
+      date: Date;
+      count: string;
+    }>();
+
+    // Fill in missing days with 0
+    const eventActivityLast7Days: Array<{ date: string; events: number }> = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(todayStart.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const result = activityResults.find(
+        (r) =>
+          new Date(r.date).toDateString() === date.toDateString(),
+      );
+      eventActivityLast7Days.push({
+        date: dateStr,
+        events: result ? parseInt(result.count, 10) : 0,
+      });
+    }
+
+    // Top actions (grouped by action, last 30 days)
+    const topActionsQuery = baseQuery
+      .clone()
+      .select('audit_event.action', 'action')
+      .addSelect('COUNT(*)', 'count')
+      .andWhere('audit_event.createdAt >= :thirtyDaysAgo', { thirtyDaysAgo })
+      .groupBy('audit_event.action')
+      .orderBy('COUNT(*)', 'DESC')
+      .limit(5);
+
+    const topActionsResults = await topActionsQuery.getRawMany<{
+      action: string;
+      count: string;
+    }>();
+
+    const topActions = topActionsResults.map((r) => ({
+      action: r.action,
+      count: parseInt(r.count, 10),
+    }));
+
+    // Recent activity (last 10 events with actor info)
+    const recentEvents = await baseQuery
+      .clone()
+      .orderBy('audit_event.createdAt', 'DESC')
+      .addOrderBy('audit_event.id', 'DESC')
+      .limit(10)
+      .getMany();
+
+    // Get actor names for user actors
+    const actorIds = recentEvents
+      .filter((e) => e.actorType === ActorType.USER && e.actorId)
+      .map((e) => e.actorId!);
+    const actors = actorIds.length > 0
+      ? await this.userRepository.find({ where: { id: In(actorIds) } }).catch(() => [])
+      : [];
+
+    const actorMap = new Map(actors.map((u) => [u.id, u.name || u.email]));
+
+    const recentActivity = recentEvents.map((event) => {
+      // Determine status from metadata or default to success
+      const status: 'success' | 'failure' =
+        event.metadata?.status === 'failure' || event.action.includes('failed')
+          ? 'failure'
+          : 'success';
+
+      return {
+        id: event.id,
+        actor: event.actorType === ActorType.USER && event.actorId
+          ? actorMap.get(event.actorId) || 'Unknown User'
+          : event.actorType === ActorType.API_KEY
+            ? 'API Key'
+            : 'System',
+        action: `${event.resourceType}.${event.action}`,
+        resourceType: event.resourceType,
+        createdAt: event.createdAt.toISOString(),
+        status,
+      };
+    });
+
+    return {
+      eventsToday,
+      eventsTodayChange,
+      activeUsers,
+      activeUsersChange,
+      successRate,
+      avgResponseTime,
+      eventActivityLast7Days,
+      topActions,
+      recentActivity,
+    };
   }
 }
 
