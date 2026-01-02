@@ -29,7 +29,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .prettierignore",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .prettierignore",
     "test:api:int": "pnpm nx test api",
-    "test:ui": "cd libs/shared/ui && pnpm vitest run",
+    "test:ui": "pnpm nx test ui",
     "test:e2e": "pnpm nx e2e web-e2e",
     "test:all": "pnpm test:api:int && pnpm test:ui && pnpm test:e2e"
   },
