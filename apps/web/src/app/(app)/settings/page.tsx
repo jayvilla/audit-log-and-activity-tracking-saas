@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePageTitle } from '../../../lib/use-page-title';
-import { getMe, getCsrfToken } from '../../../lib/api-client';
+import { getMe, getCsrfToken, getOrganization, type Organization } from '../../../lib/api-client';
 import {
   Card,
   CardContent,
@@ -26,6 +26,7 @@ export default function SettingsPage() {
   usePageTitle('Settings');
 
   const [user, setUser] = useState<UserData | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -34,16 +35,28 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
-    async function loadUser() {
+    async function loadData() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await getMe();
-        if (response?.user) {
-          setUser(response.user);
-          setName(response.user.name || '');
+        // Load user data
+        const userResponse = await getMe();
+        if (userResponse?.user) {
+          setUser(userResponse.user);
+          setName(userResponse.user.name || '');
         } else {
           setError('Failed to load user data');
+          setIsLoading(false);
+          return;
+        }
+
+        // Load organization data
+        try {
+          const org = await getOrganization();
+          setOrganization(org);
+        } catch (err) {
+          console.error('Failed to load organization:', err);
+          // Don't fail the whole page if org fails to load
         }
       } catch (err) {
         console.error('Failed to load user:', err);
@@ -53,7 +66,7 @@ export default function SettingsPage() {
       }
     }
 
-    loadUser();
+    loadData();
   }, []);
 
   const handleSaveName = async () => {
@@ -244,15 +257,11 @@ export default function SettingsPage() {
                 </Label>
                 <Input
                   id="workspace-name"
-                  value="Organization Name"
+                  value={organization?.name || 'Loading...'}
                   disabled
                   className="bg-bg-ui-30/50 border-border opacity-50"
                 />
                 <p className="text-xs text-fg-muted">
-                  {/* TODO: Organization data not available from current API.
-                  GET /api/orgs endpoint needs to be implemented to fetch
-                  organization name. Currently only orgId is available from
-                  /api/auth/me. */}
                   Workspace settings are managed by your administrator.
                 </p>
               </div>
@@ -280,13 +289,13 @@ export default function SettingsPage() {
                 </Label>
                 <Input
                   id="current-plan"
-                  value="Enterprise"
+                  value="Not available"
                   disabled
                   className="bg-bg-ui-30/50 border-border opacity-50"
                 />
-                {/* TODO: Plan/subscription data not available from current API.
-                This field should be populated from a subscription/billing
-                endpoint when available. */}
+                <p className="text-xs text-fg-muted">
+                  Plan and subscription information will be available in a future update.
+                </p>
               </div>
             </div>
           </div>

@@ -3,7 +3,6 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { CsrfService } from './csrf.service';
@@ -30,7 +29,7 @@ export class CsrfGuard implements CanActivate {
     // Get CSRF token from header
     const token = request.headers['x-csrf-token'] as string;
     if (!token) {
-      throw new BadRequestException('CSRF token is required in x-csrf-token header');
+      throw new ForbiddenException('CSRF token is required in x-csrf-token header');
     }
 
     // Get CSRF secret from cookie

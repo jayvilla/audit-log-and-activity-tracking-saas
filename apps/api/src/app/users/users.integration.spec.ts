@@ -37,12 +37,8 @@ describe('Users Integration', () => {
         name: 'Original Name',
       };
 
-      const registerResponse = await (await requestWithCsrf(
-        agent,
-        'post',
-        '/api/auth/register',
-        registerData,
-      )).expect(201);
+      const registerResponse = await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       const userId = registerResponse.body.user.id;
 
@@ -51,8 +47,8 @@ describe('Users Integration', () => {
         name: 'Updated Name',
       };
 
-      const updateResponse = await (await requestWithCsrf(agent, 'patch', '/api/users/me', updateData))
-        .expect(200);
+      const updateResponse = await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)
+        .then(test => test.expect(200));
 
       // Verify name was updated
       expect(updateResponse.body.user.name).toBe('Updated Name');
@@ -74,14 +70,16 @@ describe('Users Integration', () => {
         name: 'Original Name',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Try to update with empty name
       const updateData = {
         name: '',
       };
 
-      await (await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)).expect(400);
+      await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)
+        .then(test => test.expect(400));
     });
 
     it('should reject whitespace-only name', async () => {
@@ -94,14 +92,16 @@ describe('Users Integration', () => {
         name: 'Original Name',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Try to update with whitespace-only name
       const updateData = {
         name: '   ',
       };
 
-      await (await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)).expect(400);
+      await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)
+        .then(test => test.expect(400));
     });
 
     it('should create audit event when updating user profile', async () => {
@@ -114,12 +114,8 @@ describe('Users Integration', () => {
         name: 'Audit Test User',
       };
 
-      const registerResponse = await (await requestWithCsrf(
-        agent,
-        'post',
-        '/api/auth/register',
-        registerData,
-      )).expect(201);
+      const registerResponse = await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       const userId = registerResponse.body.user.id;
       const orgId = registerResponse.body.user.orgId;
@@ -135,7 +131,8 @@ describe('Users Integration', () => {
         name: 'Updated Audit Name',
       };
 
-      await (await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)).expect(200);
+      await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)
+        .then(test => test.expect(200));
 
       // Verify audit event was created
       const afterCount = await auditRepo.count({
@@ -171,7 +168,8 @@ describe('Users Integration', () => {
         name: 'Unauthorized Update',
       };
 
-      await (await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)).expect(401);
+      await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)
+        .then(test => test.expect(401));
     });
   });
 });

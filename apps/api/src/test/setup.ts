@@ -96,15 +96,31 @@ async function runMigrations(dataSource: DataSource): Promise<void> {
  * Truncate all tables (except migrations table)
  */
 export async function truncateAllTables(dataSource: DataSource): Promise<void> {
+  // Check if session table exists before truncating
+  const sessionTableExists = await dataSource.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'session'
+    );
+  `);
+
+  const tables = [
+    'webhook_deliveries',
+    'webhooks',
+    'audit_events',
+    'api_keys',
+    'users',
+    'organizations',
+  ];
+
+  // Add session table only if it exists
+  if (sessionTableExists[0]?.exists) {
+    tables.push('session');
+  }
+
   await dataSource.query(`
-    TRUNCATE TABLE 
-      webhook_deliveries,
-      webhooks,
-      audit_events,
-      api_keys,
-      users,
-      organizations,
-      session
+    TRUNCATE TABLE ${tables.join(', ')}
     RESTART IDENTITY CASCADE;
   `);
 }

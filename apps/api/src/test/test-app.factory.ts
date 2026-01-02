@@ -10,6 +10,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
+import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { AppModule } from '../app/app.module';
 import { getTestDataSource } from './setup';
 // Use require for CommonJS modules
@@ -38,26 +39,38 @@ export async function createTestApp(): Promise<INestApplication> {
         isGlobal: true,
         envFilePath: '.env.test',
         ignoreEnvFile: true, // Use programmatic config
+        load: [
+          () => ({
+            // Set very high rate limits for tests to avoid 429 errors
+            RATE_LIMIT_AUTH_MAX_REQUESTS: '1000',
+            RATE_LIMIT_AUDIT_INGEST_MAX_REQUESTS: '10000',
+            RATE_LIMIT_AUDIT_QUERY_MAX_REQUESTS: '10000',
+            RATE_LIMIT_API_KEY_MANAGEMENT_MAX_REQUESTS: '10000',
+          }),
+        ],
       }),
       TypeOrmModule.forRootAsync({
         imports: [ConfigModule],
-        useFactory: () => ({
-          type: 'postgres',
-          host: testDataSource.options.host,
-          port: testDataSource.options.port,
-          username: testDataSource.options.username,
-          password: testDataSource.options.password,
-          database: testDataSource.options.database,
-          entities: testDataSource.options.entities,
-          synchronize: false,
-          logging: false,
-          ssl: false,
-          extra: {
-            max: 1,
-            min: 1,
-            idleTimeoutMillis: 0,
-          },
-        }),
+        useFactory: () => {
+          const options = testDataSource.options as PostgresConnectionOptions;
+          return {
+            type: 'postgres' as const,
+            host: options.host,
+            port: options.port,
+            username: options.username,
+            password: options.password,
+            database: typeof options.database === 'string' ? options.database : undefined,
+            entities: options.entities,
+            synchronize: false,
+            logging: false,
+            ssl: false,
+            extra: {
+              max: 1,
+              min: 1,
+              idleTimeoutMillis: 0,
+            },
+          };
+        },
       }),
       AppModule,
     ],
@@ -84,11 +97,14 @@ export async function createTestApp(): Promise<INestApplication> {
     session({
       store: new PgSession({
         conObject: {
-          host: testDataSource.options.host,
-          port: testDataSource.options.port,
-          user: testDataSource.options.username as string,
-          password: testDataSource.options.password as string,
-          database: testDataSource.options.database as string,
+          host: (testDataSource.options as PostgresConnectionOptions).host,
+          port: (testDataSource.options as PostgresConnectionOptions).port,
+          user: (testDataSource.options as PostgresConnectionOptions).username as string,
+          password: (testDataSource.options as PostgresConnectionOptions).password as string,
+          database:
+            typeof (testDataSource.options as PostgresConnectionOptions).database === 'string'
+              ? (testDataSource.options as PostgresConnectionOptions).database
+              : undefined,
           ssl: false,
         },
         tableName: 'session',

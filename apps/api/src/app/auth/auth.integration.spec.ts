@@ -33,8 +33,8 @@ describe('Auth Integration', () => {
         name: 'Test User',
       };
 
-      const response = await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData))
-        .expect(201);
+      const response = await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Verify response structure
       expect(response.body).toHaveProperty('user');
@@ -50,7 +50,8 @@ describe('Auth Integration', () => {
       // Verify session cookie is set
       const cookies = response.headers['set-cookie'];
       expect(cookies).toBeDefined();
-      expect(cookies.some((cookie: string) => cookie.includes('sessionId'))).toBe(true);
+      const cookieArray = Array.isArray(cookies) ? cookies : cookies ? [cookies] : [];
+      expect(cookieArray.some((cookie: string) => cookie.includes('sessionId'))).toBe(true);
 
       // Verify /auth/me returns the user (session is active)
       const meResponse = await agent.get('/api/auth/me').expect(200);
@@ -68,11 +69,13 @@ describe('Auth Integration', () => {
       };
 
       // First registration should succeed
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Second registration with same email should fail
       const newAgent = requestWithAgent(app);
-      await (await requestWithCsrf(newAgent, 'post', '/api/auth/register', registerData)).expect(409);
+      await requestWithCsrf(newAgent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(409));
     });
   });
 
@@ -87,10 +90,12 @@ describe('Auth Integration', () => {
         name: 'Login User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Logout first (clear session)
-      await (await requestWithCsrf(agent, 'post', '/api/auth/logout')).expect(200);
+      await requestWithCsrf(agent, 'post', '/api/auth/logout')
+        .then(test => test.expect(200));
 
       // Verify logged out
       await agent.get('/api/auth/me').expect(401);
@@ -101,8 +106,8 @@ describe('Auth Integration', () => {
         password: 'password123',
       };
 
-      const loginResponse = await (await requestWithCsrf(agent, 'post', '/api/auth/login', loginData))
-        .expect(200);
+      const loginResponse = await requestWithCsrf(agent, 'post', '/api/auth/login', loginData)
+        .then(test => test.expect(200));
 
       // Verify response structure
       expect(loginResponse.body).toHaveProperty('user');
@@ -112,7 +117,8 @@ describe('Auth Integration', () => {
       // Verify session cookie is set
       const cookies = loginResponse.headers['set-cookie'];
       expect(cookies).toBeDefined();
-      expect(cookies.some((cookie: string) => cookie.includes('sessionId'))).toBe(true);
+      const cookieArray = Array.isArray(cookies) ? cookies : cookies ? [cookies] : [];
+      expect(cookieArray.some((cookie: string) => cookie.includes('sessionId'))).toBe(true);
 
       // Verify /auth/me returns the user after login
       const meResponse = await agent.get('/api/auth/me').expect(200);
@@ -130,7 +136,8 @@ describe('Auth Integration', () => {
         name: 'Invalid User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Try to login with wrong password
       const loginData = {
@@ -138,7 +145,8 @@ describe('Auth Integration', () => {
         password: 'wrongpassword',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/login', loginData)).expect(401);
+      await requestWithCsrf(agent, 'post', '/api/auth/login', loginData)
+        .then(test => test.expect(401));
     });
   });
 
@@ -153,13 +161,15 @@ describe('Auth Integration', () => {
         name: 'Logout User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Verify authenticated
       await agent.get('/api/auth/me').expect(200);
 
       // Logout
-      await (await requestWithCsrf(agent, 'post', '/api/auth/logout')).expect(200);
+      await requestWithCsrf(agent, 'post', '/api/auth/logout')
+        .then(test => test.expect(200));
 
       // Verify /auth/me returns 401 after logout
       await agent.get('/api/auth/me').expect(401);
@@ -184,7 +194,8 @@ describe('Auth Integration', () => {
         name: 'Me User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // /auth/me should return user
       const response = await agent.get('/api/auth/me').expect(200);

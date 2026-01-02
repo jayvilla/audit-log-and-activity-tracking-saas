@@ -111,6 +111,7 @@ async function bootstrap() {
     .addTag('webhooks', 'Webhook endpoints')
     .addTag('api-key', 'API key management endpoints')
     .addTag('users', 'User management endpoints')
+    .addTag('orgs', 'Organization endpoints')
     .build();
   const document = SwaggerModule.createDocument(app, config);
 

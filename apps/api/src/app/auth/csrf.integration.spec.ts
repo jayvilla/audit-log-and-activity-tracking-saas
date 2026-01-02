@@ -45,8 +45,8 @@ describe('CSRF Protection', () => {
       };
 
       // Using requestWithCsrf helper should succeed
-      const response = await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData))
-        .expect(201);
+      const response = await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       expect(response.body.user.email).toBe('withcsrf@example.com');
     });
@@ -63,7 +63,8 @@ describe('CSRF Protection', () => {
         name: 'Patch Test User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Try to update without CSRF token
       const updateData = {
@@ -83,15 +84,16 @@ describe('CSRF Protection', () => {
         name: 'Patch CSRF User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Update with CSRF token should succeed
       const updateData = {
         name: 'Updated Name',
       };
 
-      const response = await (await requestWithCsrf(agent, 'patch', '/api/users/me', updateData))
-        .expect(200);
+      const response = await requestWithCsrf(agent, 'patch', '/api/users/me', updateData)
+        .then(test => test.expect(200));
 
       expect(response.body.user.name).toBe('Updated Name');
     });
@@ -108,7 +110,8 @@ describe('CSRF Protection', () => {
         name: 'Delete Test User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Try to logout (DELETE-like operation) without CSRF token
       await agent.post('/api/auth/logout').expect(403);
@@ -124,10 +127,12 @@ describe('CSRF Protection', () => {
         name: 'Delete CSRF User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // Logout with CSRF token should succeed
-      await (await requestWithCsrf(agent, 'post', '/api/auth/logout')).expect(200);
+      await requestWithCsrf(agent, 'post', '/api/auth/logout')
+        .then(test => test.expect(200));
     });
   });
 
@@ -142,7 +147,8 @@ describe('CSRF Protection', () => {
         name: 'Get Test User',
       };
 
-      await (await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)).expect(201);
+      await requestWithCsrf(agent, 'post', '/api/auth/register', registerData)
+        .then(test => test.expect(201));
 
       // GET requests should work without CSRF
       const response = await agent.get('/api/auth/me').expect(200);

@@ -647,3 +647,37 @@ export async function deleteWebhook(id: string): Promise<void> {
   }
 }
 
+/**
+ * Organization types and functions
+ */
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Get current user's organization
+ */
+export async function getOrganization(): Promise<Organization> {
+  const response = await fetch(`${API_URL}/orgs`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Organization not found');
+    }
+    throw new Error('Failed to fetch organization');
+  }
+
+  return response.json();
+}
+

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '../../entities/user.entity';
@@ -14,6 +14,11 @@ export class UsersService {
   async updateUser(userId: string, updateDto: UpdateUserDto): Promise<UserEntity> {
     // Trim whitespace from name
     const trimmedName = updateDto.name.trim();
+
+    // Validate that name is not empty after trimming
+    if (trimmedName.length === 0) {
+      throw new BadRequestException('Name cannot be empty or whitespace-only');
+    }
 
     // Find user
     const user = await this.userRepository.findOne({
