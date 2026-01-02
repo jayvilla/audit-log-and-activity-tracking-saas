@@ -7,7 +7,7 @@
  */
 
 import { INestApplication } from '@nestjs/common';
-import { createTestApp } from '../../test/test-app.factory';
+import { createTestApp, closeTestApp } from '../../test/test-app.factory';
 import { requestWithAgent, requestWithCsrf } from '../../test/http-helpers';
 import { getTestDataSource } from '../../test/setup';
 import { AuditEventEntity } from '../../entities/audit-event.entity';
@@ -23,7 +23,7 @@ describe('Users Integration', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await closeTestApp(app);
   });
 
   describe('PATCH /api/users/me', () => {

@@ -9,7 +9,7 @@
  */
 
 import { INestApplication } from '@nestjs/common';
-import { createTestApp } from '../../test/test-app.factory';
+import { createTestApp, closeTestApp } from '../../test/test-app.factory';
 import { requestWithAgent, requestWithCsrf } from '../../test/http-helpers';
 
 describe('Auth Integration', () => {
@@ -20,7 +20,7 @@ describe('Auth Integration', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await closeTestApp(app);
   });
 
   describe('POST /api/auth/register', () => {

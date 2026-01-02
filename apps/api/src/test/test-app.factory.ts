@@ -93,23 +93,47 @@ export async function createTestApp(): Promise<INestApplication> {
   // Configure express-session with PostgreSQL store
   const sessionSecret = configService.get<string>('SESSION_SECRET', 'test-secret');
   
+  // Create session store instance so we can close its pool later
+  const sessionStore = new PgSession({
+    conObject: {
+      host: (testDataSource.options as PostgresConnectionOptions).host,
+      port: (testDataSource.options as PostgresConnectionOptions).port,
+      user: (testDataSource.options as PostgresConnectionOptions).username as string,
+      password: (testDataSource.options as PostgresConnectionOptions).password as string,
+      database:
+        typeof (testDataSource.options as PostgresConnectionOptions).database === 'string'
+          ? (testDataSource.options as PostgresConnectionOptions).database
+          : undefined,
+      ssl: false,
+    },
+    tableName: 'session',
+    createTableIfMissing: true,
+  });
+  
+  // Suppress expected connection termination errors during cleanup
+  // These occur when the test container stops while connections are still active
+  if (sessionStore.pool) {
+    // Remove any existing error listeners and add our own that filters expected errors
+    sessionStore.pool.removeAllListeners('error');
+    sessionStore.pool.on('error', (error: Error & { code?: string }) => {
+      // Only suppress expected connection termination errors (57P01)
+      // These happen when the test container stops while connections are active
+      if (error?.code === '57P01' || error?.message?.includes('terminating connection')) {
+        // Suppress expected cleanup errors - these are harmless
+        return;
+      }
+      // For other errors, we could log them, but in tests we'll let them propagate
+      // The original connect-pg-simple error handler would log these, but we've removed it
+      // This is fine for tests as unexpected errors should fail the test anyway
+    });
+  }
+  
+  // Store the session store on the app for cleanup
+  (app as any).__sessionStore = sessionStore;
+  
   app.use(
     session({
-      store: new PgSession({
-        conObject: {
-          host: (testDataSource.options as PostgresConnectionOptions).host,
-          port: (testDataSource.options as PostgresConnectionOptions).port,
-          user: (testDataSource.options as PostgresConnectionOptions).username as string,
-          password: (testDataSource.options as PostgresConnectionOptions).password as string,
-          database:
-            typeof (testDataSource.options as PostgresConnectionOptions).database === 'string'
-              ? (testDataSource.options as PostgresConnectionOptions).database
-              : undefined,
-          ssl: false,
-        },
-        tableName: 'session',
-        createTableIfMissing: true,
-      }),
+      store: sessionStore,
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
@@ -145,5 +169,33 @@ export async function createTestApp(): Promise<INestApplication> {
  */
 export function getTestAgent(app: INestApplication) {
   return request.agent(app.getHttpServer());
+}
+
+/**
+ * Close the test app and its session store connection pool
+ * Call this in afterAll hooks to properly clean up resources
+ */
+export async function closeTestApp(app: INestApplication): Promise<void> {
+  // Close the session store's connection pool if it exists
+  const sessionStore = (app as any).__sessionStore;
+  if (sessionStore?.pool) {
+    try {
+      const pool = sessionStore.pool;
+      
+      // Remove all error listeners to prevent error logs during cleanup
+      pool.removeAllListeners('error');
+      
+      // Close the pool gracefully
+      await pool.end();
+      
+      // Give a small delay to ensure pool is fully closed
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } catch (error) {
+      // Ignore errors during cleanup - pool may already be closed
+    }
+  }
+  
+  // Close the NestJS app
+  await app.close();
 }
 

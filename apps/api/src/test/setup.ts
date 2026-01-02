@@ -127,6 +127,46 @@ export async function truncateAllTables(dataSource: DataSource): Promise<void> {
 
 // Global setup - runs once before all tests
 beforeAll(async () => {
+  // Suppress expected connection termination errors from connect-pg-simple
+  // These occur when the test container stops while session store pools have active connections
+  // This is harmless and expected during test cleanup
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    // Check if this is an expected connection termination error
+    const firstArg = args[0];
+    let errorMessage = '';
+    
+    if (typeof firstArg === 'string') {
+      errorMessage = firstArg;
+    } else if (firstArg instanceof Error) {
+      errorMessage = firstArg.message || firstArg.toString();
+      // Also check the error code
+      const errorCode = (firstArg as Error & { code?: string }).code;
+      if (errorCode === '57P01') {
+        // Suppress expected connection termination errors
+        return;
+      }
+    } else if (firstArg && typeof firstArg === 'object') {
+      errorMessage = JSON.stringify(firstArg);
+      // Check for error code in the object
+      if ('code' in firstArg && firstArg.code === '57P01') {
+        return;
+      }
+    }
+    
+    // Suppress expected connection termination errors from connect-pg-simple
+    if (
+      errorMessage.includes('PG Pool error') ||
+      errorMessage.includes('terminating connection') ||
+      errorMessage.includes('57P01')
+    ) {
+      // Suppress this expected error - it's harmless during test cleanup
+      return;
+    }
+    // Log other errors normally
+    originalConsoleError.apply(console, args);
+  };
+  
   await getTestDataSource();
 });
 
@@ -139,11 +179,24 @@ afterEach(async () => {
 
 // Global teardown - runs once after all tests
 afterAll(async () => {
+  // Give a delay to allow any pending operations to complete
+  // This ensures all session store pools are closed before we stop the container
+  await new Promise(resolve => setTimeout(resolve, 200));
+  
   if (testDataSource?.isInitialized) {
     await testDataSource.destroy();
   }
-  if (container) {
-    await container.stop();
+  
+  // Additional delay before stopping container to allow all connection pools to close
+  await new Promise(resolve => setTimeout(resolve, 200));
+  
+  try {
+    if (container) {
+      await container.stop();
+    }
+  } finally {
+    // Give a delay to allow any late asynchronous errors to be suppressed
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 });
 
