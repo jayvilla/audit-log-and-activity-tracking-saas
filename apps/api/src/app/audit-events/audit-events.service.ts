@@ -258,7 +258,7 @@ export class AuditEventsService {
 
     // Filter by actor ID (partial match, case-insensitive)
     if (query.actorId) {
-      queryBuilder.andWhere('audit_event.actorId ILIKE :actorId', {
+      queryBuilder.andWhere('audit_event.actor_id::text ILIKE :actorId', {
         actorId: `%${query.actorId}%`,
       });
     }
