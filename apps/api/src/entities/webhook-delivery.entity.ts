@@ -25,7 +25,7 @@ export class WebhookDeliveryEntity extends BaseEntity {
   @Column({ type: 'text' })
   payload: string;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'status_code', type: 'int', nullable: true })
   statusCode: number | null;
 
   @Column({ type: 'text', nullable: true })

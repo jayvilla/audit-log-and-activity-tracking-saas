@@ -184,6 +184,14 @@ export class WebhookWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Process pending webhook deliveries (public method for testing)
+   * Allows tests to manually trigger processing without waiting for polling interval
+   */
+  async processPendingDeliveriesSync(): Promise<void> {
+    return this.processPendingDeliveries();
+  }
+
+  /**
    * Process pending webhook deliveries
    */
   private async processPendingDeliveries(): Promise<void> {

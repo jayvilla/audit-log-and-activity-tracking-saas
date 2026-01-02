@@ -12,6 +12,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { AppModule } from '../app/app.module';
+import { WebhookWorkerModule } from '../app/webhooks/webhook-worker.module';
+import { WebhookWorkerService } from '../app/webhooks/webhook-worker.service';
 import { getTestDataSource } from './setup';
 // Use require for CommonJS modules
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -73,6 +75,7 @@ export async function createTestApp(): Promise<INestApplication> {
         },
       }),
       AppModule,
+      WebhookWorkerModule, // Add webhook worker for integration tests
     ],
   }).compile();
 
@@ -160,6 +163,16 @@ export async function createTestApp(): Promise<INestApplication> {
   app.setGlobalPrefix('api');
 
   await app.init();
+
+  // Stop webhook worker auto-polling in tests (we'll call processPendingDeliveriesSync manually)
+  try {
+    const webhookWorker = app.get(WebhookWorkerService, { strict: false });
+    if (webhookWorker) {
+      webhookWorker.stop();
+    }
+  } catch {
+    // WebhookWorkerService not available, that's ok
+  }
 
   return app;
 }
