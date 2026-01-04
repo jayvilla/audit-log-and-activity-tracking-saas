@@ -1,0 +1,19 @@
+{
+  "extends": "../../apps/api/tsconfig.app.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/support/start-api-server.ts",
+    "../../apps/api/src/**/*.ts",
+    "../../apps/api/src/types/**/*.d.ts"
+  ],
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  }
+}
+
