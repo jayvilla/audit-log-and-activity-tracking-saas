@@ -53,6 +53,7 @@ module.exports = {
       '10': 'var(--accent-10)',
       '30': 'var(--accent-30)',
       '05': 'var(--accent-05)',
+      foreground: 'var(--fg-on-accent)',
     },
     
     // Semantic colors - Exact Figma values

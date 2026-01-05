@@ -128,3 +128,10 @@ export {
   SheetTitle,
   SheetDescription,
 } from './lib/sheet';
+
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from './lib/tooltip';

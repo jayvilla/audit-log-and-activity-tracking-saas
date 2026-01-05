@@ -34,6 +34,10 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
 } from '@audit-log-and-activity-tracking-saas/ui';
 import {
   Search,
@@ -821,15 +825,16 @@ export default function AuditLogsPage() {
       </Card>
 
       {/* Event Details Drawer - Exact Figma Layout */}
-      <Sheet open={!!selectedLog} onOpenChange={(open) => {
-        if (!open) {
-          setSelectedLog(null);
-          setIsRawDataExpanded(false);
-        }
-      }}>
-        <SheetContent side="right" className="w-full sm:max-w-[672px] bg-bg border-l border-border overflow-y-auto">
-          {selectedLog && (
-            <>
+      <TooltipProvider>
+        <Sheet open={!!selectedLog} onOpenChange={(open) => {
+          if (!open) {
+            setSelectedLog(null);
+            setIsRawDataExpanded(false);
+          }
+        }}>
+          <SheetContent side="right" className="w-full sm:max-w-[672px] bg-bg border-l border-border overflow-y-auto">
+            {selectedLog && (
+              <>
               <SheetHeader className="pb-6">
                 <SheetTitle className="text-base font-semibold text-fg">Audit Event Details</SheetTitle>
                 <SheetDescription className="text-sm text-fg-muted">
@@ -874,9 +879,18 @@ export default function AuditLogsPage() {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-fg">Actor & Source</h3>
-                    <Button variant="ghost" size="icon" className="h-5 w-5">
-                      <Info className="h-4 w-4" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-5 w-5">
+                          <Info className="h-3 w-3 text-fg-muted" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs">
+                          Shows who or what performed this action. Can be a human user, system process, or API key.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
                     <div className="flex flex-col gap-9">
@@ -921,9 +935,18 @@ export default function AuditLogsPage() {
                 {/* Immutable Event Notice */}
                 <Card variant="bordered" className="bg-[rgba(43,127,255,0.05)] border border-[rgba(43,127,255,0.2)] rounded-xl p-[17px]">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[rgba(43,127,255,0.1)] shrink-0">
-                      <Lock className="h-5 w-5 text-semantic-info" />
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[rgba(43,127,255,0.1)] shrink-0 cursor-help">
+                          <Lock className="h-5 w-5 text-semantic-info" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs">
+                          Audit events are cryptographically sealed and stored in an append-only log. They cannot be modified or deleted after creation.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="flex-1 flex flex-col gap-1">
                       <p className="text-sm text-semantic-info">Immutable Event</p>
                       <p className="text-xs text-fg-muted">
@@ -999,9 +1022,18 @@ export default function AuditLogsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-fg">Raw Event Data</h3>
-                      <Button variant="ghost" size="icon" className="h-5 w-5">
-                        <Info className="h-4 w-4" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-5 w-5">
+                            <Info className="h-3 w-3 text-fg-muted" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs">
+                          <p className="text-xs">
+                            Complete JSON representation of this event. Copy this to use in scripts or for debugging.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -1046,8 +1078,9 @@ export default function AuditLogsPage() {
               </div>
             </>
           )}
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+      </TooltipProvider>
     </div>
   );
 }
