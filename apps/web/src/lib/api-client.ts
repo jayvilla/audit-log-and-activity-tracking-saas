@@ -648,6 +648,154 @@ export async function deleteWebhook(id: string): Promise<void> {
 }
 
 /**
+ * Webhook Delivery types and functions
+ */
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  webhookName?: string;
+  eventType: string;
+  endpoint: string;
+  status: 'success' | 'failed' | 'pending' | 'retrying';
+  statusCode: number | null;
+  latency: number | null; // in milliseconds
+  attempts: number;
+  attemptedAt: string;
+  completedAt: string | null;
+  payload: string;
+  response: string | null;
+  error: string | null;
+}
+
+export interface GetWebhookDeliveriesParams {
+  webhookId?: string;
+  status?: 'success' | 'failed' | 'pending' | 'retrying';
+  startDate?: string;
+  endDate?: string;
+  eventType?: string;
+  endpoint?: string;
+  minLatency?: number;
+  maxLatency?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface WebhookDeliveriesResponse {
+  deliveries: WebhookDelivery[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * Get webhook deliveries with filters
+ * TODO: Implement backend endpoint if not available
+ */
+export async function getWebhookDeliveries(
+  params: GetWebhookDeliveriesParams = {},
+): Promise<WebhookDeliveriesResponse> {
+  const queryParams = new URLSearchParams();
+  
+  if (params.webhookId) queryParams.append('webhookId', params.webhookId);
+  if (params.status) queryParams.append('status', params.status);
+  if (params.startDate) queryParams.append('startDate', params.startDate);
+  if (params.endDate) queryParams.append('endDate', params.endDate);
+  if (params.eventType) queryParams.append('eventType', params.eventType);
+  if (params.endpoint) queryParams.append('endpoint', params.endpoint);
+  if (params.minLatency !== undefined) queryParams.append('minLatency', params.minLatency.toString());
+  if (params.maxLatency !== undefined) queryParams.append('maxLatency', params.maxLatency.toString());
+  if (params.limit) queryParams.append('limit', params.limit.toString());
+  if (params.offset) queryParams.append('offset', params.offset.toString());
+
+  const response = await fetch(`${API_URL}/v1/webhooks/deliveries?${queryParams.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 403) {
+      throw new Error('Forbidden: Admin role required');
+    }
+    // If endpoint doesn't exist yet, return empty response
+    if (response.status === 404) {
+      return {
+        deliveries: [],
+        total: 0,
+        limit: params.limit || 50,
+        offset: params.offset || 0,
+      };
+    }
+    throw new Error('Failed to fetch webhook deliveries');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a single webhook delivery by ID
+ * TODO: Implement backend endpoint if not available
+ */
+export async function getWebhookDelivery(id: string): Promise<WebhookDelivery> {
+  const response = await fetch(`${API_URL}/v1/webhooks/deliveries/${id}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('Webhook delivery not found');
+    }
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 403) {
+      throw new Error('Forbidden: Admin role required');
+    }
+    throw new Error('Failed to fetch webhook delivery');
+  }
+
+  return response.json();
+}
+
+/**
+ * Replay a failed webhook delivery
+ * TODO: Implement backend endpoint if not available
+ */
+export async function replayWebhookDelivery(id: string): Promise<{ success: boolean; deliveryId: string }> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/webhooks/deliveries/${id}/replay`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to replay webhook delivery' }));
+    if (response.status === 404) {
+      throw new Error('Webhook delivery not found');
+    }
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 403) {
+      throw new Error('Forbidden: Admin role required');
+    }
+    throw new Error(error.message || 'Failed to replay webhook delivery');
+  }
+
+  return response.json();
+}
+
+/**
  * Organization types and functions
  */
 export interface Organization {

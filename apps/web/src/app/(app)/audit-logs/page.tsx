@@ -774,7 +774,7 @@ export default function AuditLogsPage() {
                       </TableCell>
                       <TableCell className="px-2">
                         <div className="bg-[#27272a] inline-flex items-center px-2 py-1 rounded">
-                          <code className="text-xs text-fg leading-4 font-mono">{log.action}</code>
+                          <code className="text-xs text-fg leading-4 font-mono">{log.actorType}:{log.action}</code>
                         </div>
                       </TableCell>
                       <TableCell className="px-2">
