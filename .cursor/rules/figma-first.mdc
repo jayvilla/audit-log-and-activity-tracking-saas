@@ -1,0 +1,82 @@
+# Cursor Rule: Figma-First UI Enforcement
+
+## Purpose
+Prevent UI invention, design drift, and premature abstraction.
+Ensure all UI implementation strictly follows approved Figma designs.
+
+---
+
+## GLOBAL UI SOURCE OF TRUTH
+
+- Figma is the single source of truth for all UI and UX.
+- Cursor MUST NOT invent:
+  - Layouts
+  - Spacing
+  - Copy
+  - Interaction patterns
+  - Empty states
+  - Error states
+- If a required UI element or state is missing from Figma:
+  - STOP implementation
+  - Flag the gap explicitly
+  - Do NOT guess or improvise
+
+---
+
+## IMPLEMENTATION RULES
+
+- Match Figma exactly:
+  - Visual hierarchy
+  - Component structure
+  - Copy text
+  - States (loading, empty, error, success)
+- Reuse existing shared components where possible.
+- If a new UI component is required:
+  - It must be explicitly present in Figma.
+  - Place stateless components in `libs/shared/ui`.
+  - App-specific composition stays in `apps/*`.
+
+---
+
+## DESIGN TOKENS
+
+- All colors, spacing, typography, and radii MUST come from:
+  - `libs/shared/design-system`
+- Do NOT hardcode values.
+- If a token is missing:
+  - STOP and flag the design-system gap.
+
+---
+
+## BACKEND & SEMANTICS SAFETY
+
+- Do NOT change:
+  - Audit log immutability
+  - Event schemas
+  - Security semantics
+- UI changes must be read-only unless explicitly approved.
+
+---
+
+## AI & AUTOMATION GUARDRAILS
+
+- AI features are NOT allowed unless explicitly stated.
+- AI must be read-only by default.
+- AI must never mutate data or trigger actions.
+
+---
+
+## FAILURE MODE
+
+If any rule above cannot be satisfied:
+- Abort the task
+- Report exactly what is missing
+- Wait for human or design input
+
+---
+
+## SUCCESS CRITERIA
+
+- UI matches Figma with zero deviation
+- No new abstractions unless explicitly required
+- Trust and clarity are preserved
