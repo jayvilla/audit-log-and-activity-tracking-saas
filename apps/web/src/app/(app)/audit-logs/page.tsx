@@ -29,6 +29,11 @@ import {
   PopoverTrigger,
   PopoverContent,
   Calendar,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from '@audit-log-and-activity-tracking-saas/ui';
 import {
   Search,
@@ -36,11 +41,15 @@ import {
   Download,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   User,
   FileText,
   Database,
   X,
   CalendarIcon,
+  Copy,
+  Info,
+  Lock,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -65,8 +74,10 @@ export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditEvent | null>(null);
   const [showSecondaryFilters, setShowSecondaryFilters] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [isRawDataExpanded, setIsRawDataExpanded] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(
     startDateParam ? new Date(startDateParam) : undefined
   );
@@ -307,22 +318,48 @@ export default function AuditLogsPage() {
   };
 
   const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+    return format(new Date(timestamp), 'MM/dd/yyyy, h:mm:ss a');
+  };
+
+  const formatTimestampLong = (timestamp: string) => {
+    return format(new Date(timestamp), 'EEE, MMM d, yyyy, hh:mm:ss a zzz');
+  };
+
+  const formatTimestampISO = (timestamp: string) => {
+    return format(new Date(timestamp), "yyyy-MM-dd'T'HH:mm:ss'Z'");
   };
 
   const getActorName = (log: AuditEvent) => {
-    return log.actorId || 'Unknown';
+    // Try to get name from metadata or use actorId
+    return log.metadata?.actorName || log.actorId || 'Unknown';
   };
 
   const getActorEmail = (log: AuditEvent) => {
-    // In a real app, you'd fetch actor details
-    return '';
+    return log.metadata?.actorEmail || '';
   };
 
   const getStatus = (log: AuditEvent): 'success' | 'failure' => {
-    // Backend doesn't have status field - check metadata
     return log.metadata?.status === 'failure' ? 'failure' : 'success';
   };
+
+  const toggleRowExpansion = (logId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(logId)) {
+      newExpanded.delete(logId);
+    } else {
+      newExpanded.add(logId);
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  // Calculate stats
+  const totalEvents = logs.length;
+  const activeUsers = new Set(logs.map(log => log.actorId)).size;
+  const failedActions = logs.filter(log => getStatus(log) === 'failure').length;
 
   if (error && !isLoading) {
     return (
@@ -340,18 +377,22 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-fg">Audit Logs</h2>
-          <p className="text-sm text-fg-muted mt-1">
+    <div className="flex flex-col gap-6 pt-8 px-[38.5px]">
+      {/* Header - Exact Figma Layout */}
+      <div className="flex items-start justify-between h-14">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-semibold text-fg leading-8">Audit Logs</h2>
+          <p className="text-sm text-fg-muted leading-5">
             Immutable record of all system activity
           </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="secondary" className="gap-2">
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="h-8 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+            >
               <Download className="h-4 w-4" />
               Export
               <ChevronDown className="h-4 w-4" />
@@ -368,15 +409,15 @@ export default function AuditLogsPage() {
         </DropdownMenu>
       </div>
 
-      {/* Primary Filters */}
-      <Card variant="bordered" className="p-4 border-border">
-        <div className="flex flex-col lg:flex-row gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
+      {/* Filter Bar - Exact Figma Layout */}
+      <div className="border border-border rounded-[10px] p-[17px] h-[70px] flex flex-col">
+        <div className="h-9 relative flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1 h-9">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted pointer-events-none" />
             <Input
               placeholder="Search by actor, action, or resource..."
-              className="pl-9 bg-bg-card border-border"
+              className="pl-9 h-9 bg-bg border border-border rounded-lg text-sm text-fg-muted placeholder:text-fg-muted"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
             />
@@ -385,7 +426,11 @@ export default function AuditLogsPage() {
           {/* Date Range Preset */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="sm" className="gap-2 lg:w-[180px]">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="h-8 w-[180px] gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+              >
                 <CalendarIcon className="h-4 w-4" />
                 {dateRange}
                 <ChevronDown className="h-4 w-4" />
@@ -414,7 +459,11 @@ export default function AuditLogsPage() {
           {/* Action Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="sm" className="gap-2 lg:w-[160px]">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="h-8 w-[160px] gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+              >
                 Action
                 {actions.length > 0 && (
                   <Badge variant="default" className="ml-1 px-1 min-w-5 h-5 flex items-center justify-center text-xs">
@@ -442,7 +491,11 @@ export default function AuditLogsPage() {
           {/* Status Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="sm" className="gap-2 lg:w-[140px]">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="h-8 w-[140px] gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+              >
                 Status
                 {statuses.length > 0 && (
                   <Badge variant="default" className="ml-1 px-1 min-w-5 h-5 flex items-center justify-center text-xs">
@@ -474,7 +527,7 @@ export default function AuditLogsPage() {
           <Button
             variant="secondary"
             size="sm"
-            className="gap-2 lg:w-auto"
+            className="h-8 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
             onClick={() => setShowSecondaryFilters(!showSecondaryFilters)}
           >
             <Filter className="h-4 w-4" />
@@ -534,7 +587,7 @@ export default function AuditLogsPage() {
                 <Label className="text-xs text-fg-muted mb-1.5 block">Actor</Label>
                 <Input
                   placeholder="Name, email, or ID"
-                  className="bg-bg-card border-border"
+                  className="bg-bg border border-border"
                   value={actorFilter}
                   onChange={(e) => handleActorChange(e.target.value)}
                 />
@@ -544,7 +597,7 @@ export default function AuditLogsPage() {
                 <Select
                   value={resourceTypeFilter || 'all'}
                   onChange={(e) => handleResourceTypeChange(e.target.value)}
-                  className="bg-bg-card border-border"
+                  className="bg-bg border border-border"
                 >
                   <option value="all">All types</option>
                   {uniqueResources.map(resource => (
@@ -558,7 +611,7 @@ export default function AuditLogsPage() {
                 <Label className="text-xs text-fg-muted mb-1.5 block">Resource ID</Label>
                 <Input
                   placeholder="e.g., doc_12345"
-                  className="bg-bg-card border-border"
+                  className="bg-bg border border-border"
                   value={resourceIdFilter}
                   onChange={(e) => handleResourceIdChange(e.target.value)}
                 />
@@ -567,7 +620,7 @@ export default function AuditLogsPage() {
                 <Label className="text-xs text-fg-muted mb-1.5 block">IP Address</Label>
                 <Input
                   placeholder="e.g., 192.168.1.100"
-                  className="bg-bg-card border-border"
+                  className="bg-bg border border-border"
                   value={ipFilter}
                   onChange={(e) => handleIpChange(e.target.value)}
                 />
@@ -575,160 +628,52 @@ export default function AuditLogsPage() {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Active Filter Chips */}
-        {hasActiveFilters && (
-          <div className="pt-3 border-t border-border flex items-center justify-between mt-4">
-            <div className="flex flex-wrap gap-2 items-center">
-              <p className="text-xs text-fg-muted">
-                Showing {logs.length} events
-              </p>
-              {searchQuery && (
-                <Badge variant="default" className="gap-1 text-xs">
-                  Search: {searchQuery}
-                  <button
-                    onClick={() => removeFilter('search')}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {dateRange !== 'Last 7 days' && (
-                <Badge variant="default" className="gap-1 text-xs">
-                  {dateRange}
-                  <button
-                    onClick={() => removeFilter('dateRange')}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {actions.map(action => (
-                <Badge key={action} variant="default" className="gap-1 text-xs">
-                  Action: {action}
-                  <button
-                    onClick={() => removeFilter('action', action)}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {statuses.map(status => (
-                <Badge key={status} variant="default" className="gap-1 text-xs">
-                  Status: {status}
-                  <button
-                    onClick={() => removeFilter('status', status)}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {actorFilter && (
-                <Badge variant="default" className="gap-1 text-xs">
-                  Actor: {actorFilter}
-                  <button
-                    onClick={() => removeFilter('actor')}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {resourceTypeFilter && (
-                <Badge variant="default" className="gap-1 text-xs">
-                  Resource: {resourceTypeFilter}
-                  <button
-                    onClick={() => removeFilter('resourceType')}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {resourceIdFilter && (
-                <Badge variant="default" className="gap-1 text-xs">
-                  Resource ID: {resourceIdFilter}
-                  <button
-                    onClick={() => removeFilter('resourceId')}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {ipFilter && (
-                <Badge variant="default" className="gap-1 text-xs">
-                  IP: {ipFilter}
-                  <button
-                    onClick={() => removeFilter('ip')}
-                    className="ml-1 hover:opacity-70"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearAllFilters}
-              className="gap-2 h-7"
-            >
-              <X className="h-3 w-3" />
-              Clear all filters
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card variant="bordered" className="p-4 border-border">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-10">
+      {/* Stats Cards - Exact Figma Layout */}
+      <div className="grid grid-cols-3 gap-4 h-[86px]">
+        <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+          <div className="flex gap-3 items-center h-full">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent-10 shrink-0">
               <FileText className="h-5 w-5 text-accent" />
             </div>
-            <div>
-              <p className="text-sm text-fg-muted">Total Events</p>
-              <p className="text-2xl font-semibold text-fg">
-                {isLoading ? <Skeleton className="h-8 w-16" /> : logs.length.toLocaleString()}
+            <div className="flex flex-col">
+              <p className="text-sm text-fg-muted leading-5">Total Events</p>
+              <p className="text-2xl font-semibold text-fg leading-8">
+                {isLoading ? <Skeleton className="h-8 w-16" /> : totalEvents.toLocaleString()}
               </p>
             </div>
           </div>
         </Card>
-        <Card variant="bordered" className="p-4 border-border">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-semantic-success/10">
+        <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+          <div className="flex gap-3 items-center h-full">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[rgba(0,201,80,0.1)] shrink-0">
               <User className="h-5 w-5 text-semantic-success" />
             </div>
-            <div>
-              <p className="text-sm text-fg-muted">Active Users</p>
-              <p className="text-2xl font-semibold text-fg">
+            <div className="flex flex-col">
+              <p className="text-sm text-fg-muted leading-5">Active Users</p>
+              <p className="text-2xl font-semibold text-fg leading-8">
                 {isLoading ? (
                   <Skeleton className="h-8 w-16" />
                 ) : (
-                  new Set(logs.map(log => log.actorId)).size
+                  activeUsers
                 )}
               </p>
             </div>
           </div>
         </Card>
-        <Card variant="bordered" className="p-4 border-border">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
-              <Database className="h-5 w-5 text-red-500" />
+        <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+          <div className="flex gap-3 items-center h-full">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[rgba(251,44,54,0.1)] shrink-0">
+              <Database className="h-5 w-5 text-[#fb2c36]" />
             </div>
-            <div>
-              <p className="text-sm text-fg-muted">Failed Actions</p>
-              <p className="text-2xl font-semibold text-fg">
+            <div className="flex flex-col">
+              <p className="text-sm text-fg-muted leading-5">Failed Actions</p>
+              <p className="text-2xl font-semibold text-fg leading-8">
                 {isLoading ? (
                   <Skeleton className="h-8 w-16" />
                 ) : (
-                  logs.filter(log => getStatus(log) === 'failure').length
+                  failedActions
                 )}
               </p>
             </div>
@@ -736,8 +681,8 @@ export default function AuditLogsPage() {
         </Card>
       </div>
 
-      {/* Table */}
-      <Card variant="bordered" className="overflow-hidden border-border">
+      {/* Table - Exact Figma Layout with Expandable Rows */}
+      <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="p-8 space-y-4">
             {[...Array(5)].map((_, i) => (
@@ -764,84 +709,105 @@ export default function AuditLogsPage() {
         ) : (
           <Table>
             <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="w-[40px]"></TableHead>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Resource</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>IP Address</TableHead>
+              <TableRow className="border-border hover:bg-transparent h-10">
+                <TableHead className="w-10 p-0"></TableHead>
+                <TableHead className="text-sm text-fg leading-5 px-2">Timestamp</TableHead>
+                <TableHead className="text-sm text-fg leading-5 px-2">Actor</TableHead>
+                <TableHead className="text-sm text-fg leading-5 px-2">Action</TableHead>
+                <TableHead className="text-sm text-fg leading-5 px-2">Resource</TableHead>
+                <TableHead className="text-sm text-fg leading-5 px-2">Status</TableHead>
+                <TableHead className="text-sm text-fg leading-5 px-2">IP Address</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {logs.map((log) => {
-                const isExpanded = expandedRow === log.id;
                 const status = getStatus(log);
+                const isExpanded = expandedRows.has(log.id);
+                const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0;
+                
                 return (
                   <>
                     <TableRow
                       key={log.id}
-                      className="border-border hover:bg-accent-10 cursor-pointer"
-                      onClick={() => setExpandedRow(isExpanded ? null : log.id)}
+                      className="border-border hover:bg-transparent h-[53px] cursor-pointer"
+                      onClick={() => {
+                        setSelectedLog(log);
+                      }}
                     >
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
-                          {isExpanded ? (
-                            <ChevronDown className="h-3 w-3" />
+                      <TableCell className="p-0 w-10">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 rounded-lg"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (hasMetadata) {
+                              toggleRowExpansion(log.id);
+                            }
+                          }}
+                        >
+                          {hasMetadata ? (
+                            isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )
                           ) : (
-                            <ChevronRight className="h-3 w-3" />
+                            <ChevronRight className="h-4 w-4" />
                           )}
                         </Button>
                       </TableCell>
-                      <TableCell className="text-sm text-fg-muted font-mono">
+                      <TableCell className="text-sm text-fg-muted font-mono leading-5 px-2">
                         {formatTimestamp(log.createdAt)}
                       </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm font-medium text-fg">{getActorName(log)}</p>
+                      <TableCell className="px-2">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-sm text-fg leading-5">{getActorName(log)}</p>
                           {getActorEmail(log) && (
-                            <p className="text-xs text-fg-muted">{getActorEmail(log)}</p>
+                            <p className="text-xs text-fg-muted leading-4">{getActorEmail(log)}</p>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-accent-10 px-2 py-1 rounded text-accent">
-                          {log.actorType}:{log.action}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm text-fg">{log.resourceType}</p>
-                          <p className="text-xs text-fg-muted font-mono">{log.resourceId}</p>
+                      <TableCell className="px-2">
+                        <div className="bg-[#27272a] inline-flex items-center px-2 py-1 rounded">
+                          <code className="text-xs text-fg leading-4 font-mono">{log.action}</code>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-2">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-sm text-fg leading-5">{log.resourceType}</p>
+                          <p className="text-xs text-fg-muted font-mono leading-4">{log.resourceId}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-2">
                         <Badge
                           variant="default"
                           className={
                             status === 'success'
-                              ? 'border-semantic-success/30 bg-semantic-success/10 text-semantic-success'
-                              : 'border-red-500/30 bg-red-500/10 text-red-500'
+                              ? 'border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.1)] text-semantic-success h-[22px] px-2.5 py-0.5 rounded-lg text-xs leading-4'
+                              : 'border-[rgba(251,44,54,0.3)] bg-[rgba(251,44,54,0.1)] text-[#fb2c36] h-[22px] px-2.5 py-0.5 rounded-lg text-xs leading-4'
                           }
                         >
                           {status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-fg-muted font-mono">
+                      <TableCell className="text-sm text-fg-muted font-mono leading-5 px-2">
                         {log.ipAddress || 'N/A'}
                       </TableCell>
                     </TableRow>
-                    {isExpanded && (
-                      <TableRow className="border-border hover:bg-transparent">
-                        <TableCell colSpan={7} className="bg-accent-10 p-4">
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-fg-muted uppercase tracking-wide">
+                    {/* Expanded Metadata Row */}
+                    {isExpanded && hasMetadata && (
+                      <TableRow className="border-border">
+                        <TableCell colSpan={7} className="p-0 bg-[rgba(39,39,42,0.3)]">
+                          <div className="flex flex-col gap-2 p-4">
+                            <p className="text-xs text-fg-muted uppercase tracking-[0.3px]">
                               Event Metadata
                             </p>
-                            <pre className="text-xs bg-bg-card border border-border rounded-md p-3 overflow-x-auto text-fg">
-                              <code>{JSON.stringify(log.metadata || {}, null, 2)}</code>
-                            </pre>
+                            <div className="bg-bg border border-border rounded-lg p-3.5 overflow-x-auto">
+                              <pre className="text-xs font-mono text-fg leading-4 m-0">
+                                <code>{JSON.stringify(log.metadata, null, 2)}</code>
+                              </pre>
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -853,6 +819,235 @@ export default function AuditLogsPage() {
           </Table>
         )}
       </Card>
+
+      {/* Event Details Drawer - Exact Figma Layout */}
+      <Sheet open={!!selectedLog} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedLog(null);
+          setIsRawDataExpanded(false);
+        }
+      }}>
+        <SheetContent side="right" className="w-full sm:max-w-[672px] bg-bg border-l border-border overflow-y-auto">
+          {selectedLog && (
+            <>
+              <SheetHeader className="pb-6">
+                <SheetTitle className="text-base font-semibold text-fg">Audit Event Details</SheetTitle>
+                <SheetDescription className="text-sm text-fg-muted">
+                  Complete information for this audit event
+                </SheetDescription>
+              </SheetHeader>
+              
+              <div className="flex flex-col gap-6 pt-6">
+                {/* Event Summary */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-semibold text-fg tracking-[-0.14px]">Event Summary</h3>
+                  <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+                    <div className="flex items-start justify-between">
+                      <div className="flex flex-col gap-1">
+                        <div className="bg-[#27272a] inline-flex items-center px-3 py-1.5 rounded">
+                          <code className="text-base font-mono text-fg">{selectedLog.action}</code>
+                        </div>
+                        <p className="text-sm text-fg-muted">
+                          {formatTimestampLong(selectedLog.createdAt)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="default"
+                        className={
+                          getStatus(selectedLog) === 'success'
+                            ? 'border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.1)] text-semantic-success h-[22px] px-2.5 py-0.5 rounded-lg text-xs leading-4 flex items-center gap-1.5'
+                            : 'border-[rgba(251,44,54,0.3)] bg-[rgba(251,44,54,0.1)] text-[#fb2c36] h-[22px] px-2.5 py-0.5 rounded-lg text-xs leading-4 flex items-center gap-1.5'
+                        }
+                      >
+                        {getStatus(selectedLog) === 'success' && (
+                          <span className="w-3 h-3 rounded-full bg-semantic-success" />
+                        )}
+                        {getStatus(selectedLog)}
+                      </Badge>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="h-px bg-border" />
+
+                {/* Actor & Source */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-fg">Actor & Source</h3>
+                    <Button variant="ghost" size="icon" className="h-5 w-5">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+                    <div className="flex flex-col gap-9">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent-10 shrink-0">
+                          <User className="h-4 w-4 text-accent" />
+                        </div>
+                        <div className="flex-1 flex flex-col gap-0.5">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-fg">{getActorName(selectedLog)}</p>
+                            <Badge variant="default" className="border-[rgba(43,127,255,0.3)] bg-[rgba(43,127,255,0.1)] text-semantic-info h-[22px] px-2.5 py-0.5 rounded-lg text-xs leading-4 flex items-center gap-1.5">
+                              <span className="w-3 h-3 rounded-full bg-semantic-info" />
+                              Human
+                            </Badge>
+                          </div>
+                          {getActorEmail(selectedLog) && (
+                            <p className="text-xs text-fg-muted font-mono">{getActorEmail(selectedLog)}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-xs text-fg-muted">IP Address</p>
+                          <div className="bg-[#27272a] inline-flex items-center px-2 py-1 rounded">
+                            <code className="text-xs font-mono text-fg">{selectedLog.ipAddress || 'N/A'}</code>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <p className="text-xs text-fg-muted">Event ID</p>
+                          <div className="bg-[#27272a] inline-flex items-center px-2 py-1 rounded">
+                            <code className="text-xs font-mono text-fg">{selectedLog.id}</code>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="h-px bg-border" />
+
+                {/* Immutable Event Notice */}
+                <Card variant="bordered" className="bg-[rgba(43,127,255,0.05)] border border-[rgba(43,127,255,0.2)] rounded-xl p-[17px]">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[rgba(43,127,255,0.1)] shrink-0">
+                      <Lock className="h-5 w-5 text-semantic-info" />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <p className="text-sm text-semantic-info">Immutable Event</p>
+                      <p className="text-xs text-fg-muted">
+                        This event is permanently recorded and cannot be modified or deleted. Part of your tamper-proof audit trail.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+
+                <div className="h-px bg-border" />
+
+                {/* Event Details */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-semibold text-fg tracking-[-0.14px]">Event Details</h3>
+                  <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+                    <div className="flex flex-col gap-3">
+                      <div className="grid grid-cols-[120px_1fr] gap-2 items-center">
+                        <p className="text-xs text-fg-muted">Action</p>
+                        <div className="bg-[#27272a] flex items-center px-2 py-1 rounded w-full">
+                          <code className="text-xs font-mono text-fg text-left">{selectedLog.action}</code>
+                        </div>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="grid grid-cols-[120px_1fr] gap-2 items-center">
+                        <p className="text-xs text-fg-muted">Resource Type</p>
+                        <div className="bg-[#27272a] flex items-center px-2 py-1 rounded w-full">
+                          <code className="text-xs font-mono text-fg text-left">{selectedLog.resourceType}</code>
+                        </div>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="grid grid-cols-[120px_1fr] gap-2 items-center">
+                        <p className="text-xs text-fg-muted">Resource ID</p>
+                        <div className="bg-[#27272a] flex items-center px-2 py-1 rounded w-full">
+                          <code className="text-xs font-mono text-fg text-left">{selectedLog.resourceId}</code>
+                        </div>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="grid grid-cols-[120px_1fr] gap-2">
+                        <p className="text-xs text-fg-muted">Timestamp</p>
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="bg-[#27272a] flex items-center px-2 py-1 rounded w-full">
+                            <code className="text-xs font-mono text-fg text-left">{formatTimestampISO(selectedLog.createdAt)}</code>
+                          </div>
+                          <p className="text-xs text-fg-muted text-left">{formatTimestamp(selectedLog.createdAt)}</p>
+                        </div>
+                      </div>
+                      {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+                        <>
+                          <div className="h-px bg-border" />
+                          <div className="grid grid-cols-[120px_1fr] gap-2">
+                            <p className="text-xs text-fg-muted">Metadata</p>
+                            <div className="flex flex-col gap-1 w-full">
+                              {Object.entries(selectedLog.metadata).map(([key, value]) => (
+                                <div key={key} className="flex items-center gap-2 w-full">
+                                  <span className="text-xs text-fg-muted font-mono w-24 flex-shrink-0">{key}:</span>
+                                  <div className="flex-1 bg-[#27272a] flex items-center px-1.5 py-0.5 rounded">
+                                    <code className="text-xs font-mono text-fg text-left">{String(value)}</code>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="h-px bg-border" />
+
+                {/* Raw Event Data */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-fg">Raw Event Data</h3>
+                      <Button variant="ghost" size="icon" className="h-5 w-5">
+                        <Info className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+                        onClick={() => copyToClipboard(JSON.stringify(selectedLog, null, 2))}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+                        onClick={() => setIsRawDataExpanded(!isRawDataExpanded)}
+                      >
+                        {isRawDataExpanded ? (
+                          <>
+                            <ChevronDown className="h-4 w-4 rotate-180" />
+                            Collapse
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Expand
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {isRawDataExpanded && (
+                    <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl p-[17px]">
+                      <div className="bg-[#18181b] rounded-lg p-4 overflow-x-auto">
+                        <pre className="text-xs font-mono text-fg leading-4 m-0">
+                          <code>{JSON.stringify(selectedLog, null, 2)}</code>
+                        </pre>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
