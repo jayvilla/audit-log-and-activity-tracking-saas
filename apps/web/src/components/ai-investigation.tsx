@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
   TooltipProvider,
   Skeleton,
+  cn,
 } from '@audit-log-and-activity-tracking-saas/ui';
 import {
   Sparkles,
@@ -336,21 +337,31 @@ export function AIInvestigation({
         </div>
 
         {/* View Mode Toggle */}
-        {data.correlationGroups && data.correlationGroups.length > 0 && data.timeline && data.timeline.length > 0 && (
+        {((data.correlationGroups && data.correlationGroups.length > 0) || (data.timeline && data.timeline.length > 0)) && (
           <div className="flex items-center gap-2">
             <Button
-              variant={viewMode === 'correlation' ? 'default' : 'outline'}
+              variant="ghost"
               size="sm"
-              className="h-8 gap-2"
+              className={cn(
+                "h-8 gap-2",
+                viewMode === 'correlation'
+                  ? 'bg-accent text-fg'
+                  : 'text-fg-muted hover:text-fg hover:bg-accent-10'
+              )}
               onClick={() => setViewMode('correlation')}
             >
               <GitBranch className="h-4 w-4" />
               Correlation Groups
             </Button>
             <Button
-              variant={viewMode === 'timeline' ? 'default' : 'outline'}
+              variant="ghost"
               size="sm"
-              className="h-8 gap-2"
+              className={cn(
+                "h-8 gap-2",
+                viewMode === 'timeline'
+                  ? 'bg-accent text-fg'
+                  : 'text-fg-muted hover:text-fg hover:bg-accent-10'
+              )}
               onClick={() => setViewMode('timeline')}
             >
               <Clock className="h-4 w-4" />
