@@ -61,6 +61,7 @@ import {
   type GetWebhookDeliveriesParams,
   type Webhook,
 } from '../../../../lib/api-client';
+import { WebhookReplayDialog } from './webhook-replay-dialog';
 
 interface DeliveryMetrics {
   successRate: number;
@@ -98,6 +99,10 @@ export default function WebhookDeliveriesPage() {
   }>({ payload: false, response: false });
   const [copiedRequest, setCopiedRequest] = useState(false);
   const [copiedResponse, setCopiedResponse] = useState(false);
+
+  // Replay dialog state
+  const [replayDelivery, setReplayDelivery] = useState<WebhookDelivery | null>(null);
+  const [isReplayDialogOpen, setIsReplayDialogOpen] = useState(false);
 
   // Load webhooks for mapping
   useEffect(() => {
@@ -270,12 +275,61 @@ export default function WebhookDeliveriesPage() {
     setIsDrawerOpen(true);
   };
 
-  const handleReplay = async (deliveryId: string) => {
+  const handleReplayClick = (delivery: WebhookDelivery) => {
+    setReplayDelivery(delivery);
+    setIsReplayDialogOpen(true);
+  };
+
+  const handleReplayConfirm = async () => {
+    if (!replayDelivery) return;
+
     try {
-      await replayWebhookDelivery(deliveryId);
+      await replayWebhookDelivery(replayDelivery.id);
       // Reload deliveries after replay
-      const data = await getWebhookDeliveries({ limit: 50 });
-      setDeliveries(data.deliveries);
+      const now = new Date();
+      let startDate: string | undefined;
+      if (dateRange === 'Last 7 days') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      } else if (dateRange === 'Last 30 days') {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      } else if (dateRange === 'Last 90 days') {
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      const params: GetWebhookDeliveriesParams = {
+        webhookId: selectedWebhook !== 'all' ? selectedWebhook : undefined,
+        status: selectedStatus !== 'all' ? selectedStatus as any : undefined,
+        startDate,
+        eventType: eventType || undefined,
+        endpoint: endpoint || undefined,
+        minLatency: minLatency ? parseInt(minLatency) : undefined,
+        maxLatency: maxLatency ? parseInt(maxLatency) : undefined,
+        limit: 50,
+      };
+
+      const data = await getWebhookDeliveries(params);
+      
+      // Map webhook names
+      const webhookMap = new Map(webhooks.map((w) => [w.id, w.name]));
+      const deliveriesWithNames = data.deliveries.map((d) => ({
+        ...d,
+        webhookName: d.webhookName || webhookMap.get(d.webhookId) || 'Unknown',
+      }));
+      
+      // Apply search filter
+      let filteredDeliveries = deliveriesWithNames;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filteredDeliveries = deliveriesWithNames.filter(
+          (d) =>
+            d.webhookName?.toLowerCase().includes(query) ||
+            d.eventType.toLowerCase().includes(query) ||
+            d.endpoint.toLowerCase().includes(query)
+        );
+      }
+      
+      setDeliveries(filteredDeliveries);
+      setReplayDelivery(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to replay delivery';
       setError(message);
@@ -595,7 +649,7 @@ export default function WebhookDeliveriesPage() {
                           className="gap-1"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleReplay(delivery.id);
+                            handleReplayClick(delivery);
                           }}
                         >
                           <RotateCw className="h-3 w-3" />
@@ -983,7 +1037,7 @@ export default function WebhookDeliveriesPage() {
                         variant="outline"
                         size="sm"
                         className="gap-2"
-                        onClick={() => handleReplay(selectedDelivery.id)}
+                        onClick={() => handleReplayClick(selectedDelivery)}
                       >
                         <RotateCw className="h-4 w-4" />
                         Replay Delivery
@@ -996,6 +1050,14 @@ export default function WebhookDeliveriesPage() {
           </SheetContent>
         </Sheet>
       </TooltipProvider>
+
+      {/* Replay Dialog */}
+      <WebhookReplayDialog
+        delivery={replayDelivery}
+        open={isReplayDialogOpen}
+        onOpenChange={setIsReplayDialogOpen}
+        onConfirm={handleReplayConfirm}
+      />
     </div>
   );
 }
