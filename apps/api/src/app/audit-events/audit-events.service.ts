@@ -1049,64 +1049,125 @@ export class AuditEventsService {
     );
     const filtersStr = formatFilters(query.filters || {}).join('; ') || 'None';
 
-    // SIMPLE TEST PROMPT - Remove this and use the full prompt below once confirmed working
-    const systemPrompt = `You are an audit log analysis assistant. Provide a brief summary of audit events.`;
+    // System prompt: Define the AI's role and constraints
+    const systemPrompt = `You are an audit log analysis assistant. Your role is to analyze audit events and provide factual, grounded insights.
+
+CRITICAL RULES:
+- Be factual and grounded ONLY in the provided data. Never invent events, timestamps, actors, or details.
+- If you're uncertain about something, state that clearly.
+- Focus on observable patterns, trends, and notable events.
+- Security-related events (failures, unauthorized access, suspicious patterns) should be highlighted.
+- Operational changes (new resources, configuration changes, access patterns) should be noted.
+
+Your analysis should help users understand:
+1. What happened during this time period
+2. Notable patterns or trends
+3. Significant changes or anomalies
+4. Security or operational concerns (if any)`;
 
     try {
-      // SIMPLE TEST: Just send a minimal prompt to verify LLM works
-      const eventCount = redactedEvents.length;
-      const userPrompt = `You have ${eventCount} audit events from ${timeRangeStr}${filtersStr ? ` with filters: ${filtersStr}` : ''}.
-
-Provide a brief 2-3 sentence summary of what happened. Format as JSON:
-{
-  "summary": "brief summary text here",
-  "patterns": [],
-  "changes": []
-}`;
-
-      // FULL PROMPT (uncomment once simple test works):
-      /*
-      const systemPrompt = `You are an audit log analysis assistant. Analyze the provided audit events and generate a concise summary. 
-      Focus on:
-      1. Overall activity patterns and trends
-      2. Notable security or operational events
-      3. Changes in behavior over time
-      4. Any anomalies or patterns worth highlighting
-
-      Be factual and grounded in the data. Do not invent events or details not present in the data.
-      If you're uncertain about something, state that clearly.`;
-
-      // Limit events sent to LLM to avoid timeout - use even smaller subset for faster processing
-      const eventsToSend = redactedEvents.slice(0, 50); // Limit to first 50 events for faster processing
-      const eventSummary = redactedEvents.length > 50 
-        ? `\n\nNote: Analyzing ${eventsToSend.length} of ${redactedEvents.length} total events.`
+      // Limit events sent to LLM to avoid timeout - use a manageable subset
+      const eventsToSend = redactedEvents.slice(0, 50);
+      const eventCountNote = redactedEvents.length > 50 
+        ? `\nNote: Analyzing ${eventsToSend.length} representative events from ${redactedEvents.length} total events.`
         : '';
       
-      // Create a more compact event summary instead of full JSON
-      const eventSummaryText = eventsToSend.map((e, i) => 
-        `${i + 1}. ${e.timestamp} - ${e.action} on ${e.resourceType}${e.resourceId ? ` (${e.resourceId})` : ''}${e.status ? ` - ${e.status}` : ''}`
-      ).join('\n');
+      // Create a structured event summary for analysis
+      const eventSummaryText = eventsToSend.map((e, i) => {
+        const parts = [
+          `${i + 1}. [${e.timestamp}]`,
+          `${e.action}`,
+          `on ${e.resourceType}`,
+        ];
+        
+        if (e.resourceId) {
+          parts.push(`(${e.resourceId})`);
+        }
+        
+        if (e.status) {
+          parts.push(`- Status: ${e.status}`);
+        }
+        
+        if (e.actorType && e.actorId) {
+          parts.push(`- Actor: ${e.actorType}:${e.actorId}`);
+        }
+        
+        if (e.metadataSummary) {
+          parts.push(`- Metadata: ${e.metadataSummary}`);
+        }
+        
+        return parts.join(' ');
+      }).join('\n');
       
-      const userPrompt = `Analyze these ${eventsToSend.length} audit events${eventSummary}:
+      // Group events by action for pattern analysis
+      const actionCounts: Record<string, number> = {};
+      const statusCounts: Record<string, number> = {};
+      const resourceTypeCounts: Record<string, number> = {};
+      
+      eventsToSend.forEach(e => {
+        actionCounts[e.action] = (actionCounts[e.action] || 0) + 1;
+        if (e.status) {
+          statusCounts[e.status] = (statusCounts[e.status] || 0) + 1;
+        }
+        resourceTypeCounts[e.resourceType] = (resourceTypeCounts[e.resourceType] || 0) + 1;
+      });
+      
+      const actionSummary = Object.entries(actionCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([action, count]) => `  - ${action}: ${count} events`)
+        .join('\n');
+      
+      const userPrompt = `Analyze these audit events and provide insights:
 
-      Time Range: ${timeRangeStr}
-      Filters: ${filtersStr}
+Time Range: ${timeRangeStr}
+Applied Filters: ${filtersStr || 'None'}
+${eventCountNote}
 
-      Event Summary:
-      ${eventSummaryText}
+Event Details:
+${eventSummaryText}
 
-      Provide:
-      1. A concise summary (2-3 paragraphs) of the overall activity
-      2. Key patterns identified (if any) with event counts
-      3. Notable changes or trends (if any)
+Event Statistics:
+Most Common Actions:
+${actionSummary}
 
-      Format your response as JSON:
-      {
-        "summary": "string",
-        "patterns": [{"id": "string", "title": "string", "description": "string", "eventCount": number, "severity": "low|medium|high"}],
-        "changes": [{"id": "string", "description": "string", "eventCount": number}]
-      }`;
-      */
+Status Distribution:
+${Object.entries(statusCounts).map(([status, count]) => `  - ${status}: ${count} events`).join('\n')}
+
+Most Active Resource Types:
+${Object.entries(resourceTypeCounts)
+  .sort(([, a], [, b]) => b - a)
+  .slice(0, 5)
+  .map(([type, count]) => `  - ${type}: ${count} events`)
+  .join('\n')}
+
+Provide your analysis in the following JSON format:
+{
+  "summary": "A concise 2-3 paragraph summary of the overall activity, highlighting key trends, notable events, and any security or operational concerns. Be specific about what you observed in the data.",
+  "patterns": [
+    {
+      "id": "pattern_1",
+      "title": "Pattern title (e.g., 'Repeated Failed Login Attempts')",
+      "description": "Detailed description of the pattern with specific event counts and context",
+      "eventCount": 5,
+      "severity": "low|medium|high"
+    }
+  ],
+  "changes": [
+    {
+      "id": "change_1",
+      "description": "Description of a notable change or trend (e.g., 'New API key creation pattern detected')",
+      "eventCount": 3
+    }
+  ]
+}
+
+Guidelines:
+- Only include patterns if you observe clear, repeated behaviors (3+ similar events)
+- Only include changes if you observe notable shifts or new activity types
+- Set severity to "high" for security concerns (failures, unauthorized access), "medium" for operational concerns, "low" for informational patterns
+- If no clear patterns or changes exist, use empty arrays []
+- Be specific: reference actual actions, resource types, and timeframes from the data`;
 
       const llmResponse = await this.llmService.generate({
         model: 'llama3',
