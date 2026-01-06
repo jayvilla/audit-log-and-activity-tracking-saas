@@ -2,8 +2,20 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getAuditEvents, exportAuditEventsAsJson, exportAuditEventsAsCsv, type AuditEvent, type GetAuditEventsParams } from '../../../lib/api-client';
+import { 
+  getAuditEvents, 
+  exportAuditEventsAsJson, 
+  exportAuditEventsAsCsv, 
+  type AuditEvent, 
+  type GetAuditEventsParams,
+  getSavedViews,
+  createSavedView,
+  deleteSavedView,
+  recordSavedViewUsage,
+  type SavedView,
+} from '../../../lib/api-client';
 import { usePageTitle } from '../../../lib/use-page-title';
+import { SavedViewsDialog, type SavedViewFilters } from '../../../components/saved-views-dialog';
 import {
   Button,
   Input,
@@ -54,6 +66,7 @@ import {
   Copy,
   Info,
   Lock,
+  Save,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -88,6 +101,9 @@ export default function AuditLogsPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(
     endDateParam ? new Date(endDateParam) : undefined
   );
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [savedViewsDialogOpen, setSavedViewsDialogOpen] = useState(false);
+  const [isSavingView, setIsSavingView] = useState(false);
 
   // Update URL params
   const updateSearchParams = (updates: Record<string, string | null>) => {
@@ -101,6 +117,21 @@ export default function AuditLogsPage() {
     });
     router.push(`/audit-logs?${params.toString()}`);
   };
+
+  // Load saved views
+  useEffect(() => {
+    async function loadSavedViews() {
+      try {
+        const views = await getSavedViews();
+        setSavedViews(views);
+      } catch (err: any) {
+        console.error('Failed to load saved views:', err);
+        // Don't show error to user, just log it
+      }
+    }
+
+    loadSavedViews();
+  }, []);
 
   // Load data
   useEffect(() => {
@@ -360,6 +391,137 @@ export default function AuditLogsPage() {
     navigator.clipboard.writeText(text);
   };
 
+  // Saved views handlers
+  const getCurrentFilters = (): SavedViewFilters => {
+    return {
+      search: searchQuery || undefined,
+      dateRange: dateRange !== 'Last 7 days' ? dateRange : undefined,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      actions: actions.length > 0 ? actions : undefined,
+      statuses: statuses.length > 0 ? statuses : undefined,
+      actor: actorFilter || undefined,
+      resourceType: resourceTypeFilter || undefined,
+      resourceId: resourceIdFilter || undefined,
+      ip: ipFilter || undefined,
+    };
+  };
+
+  const handleSaveView = async (name: string, description?: string) => {
+    setIsSavingView(true);
+    try {
+      const filters = getCurrentFilters();
+      await createSavedView({
+        name,
+        description,
+        filters,
+      });
+      // Reload saved views
+      const views = await getSavedViews();
+      setSavedViews(views);
+    } catch (err: any) {
+      console.error('Failed to save view:', err);
+      setError(err.message || 'Failed to save view');
+    } finally {
+      setIsSavingView(false);
+    }
+  };
+
+  const handleLoadView = async (view: SavedView) => {
+    try {
+      // Record usage
+      await recordSavedViewUsage(view.id);
+      
+      // Update saved views to reflect new usage count
+      const views = await getSavedViews();
+      setSavedViews(views);
+
+      // Apply filters from saved view
+      const updates: Record<string, string | null> = {};
+      
+      if (view.filters.search) {
+        updates.search = view.filters.search;
+      } else {
+        updates.search = null;
+      }
+
+      if (view.filters.dateRange) {
+        updates.dateRange = view.filters.dateRange;
+      } else {
+        updates.dateRange = null;
+      }
+
+      if (view.filters.startDate) {
+        updates.startDate = view.filters.startDate;
+        setStartDate(new Date(view.filters.startDate));
+      } else {
+        updates.startDate = null;
+        setStartDate(undefined);
+      }
+
+      if (view.filters.endDate) {
+        updates.endDate = view.filters.endDate;
+        setEndDate(new Date(view.filters.endDate));
+      } else {
+        updates.endDate = null;
+        setEndDate(undefined);
+      }
+
+      if (view.filters.actions && view.filters.actions.length > 0) {
+        updates.actions = view.filters.actions.join(',');
+      } else {
+        updates.actions = null;
+      }
+
+      if (view.filters.statuses && view.filters.statuses.length > 0) {
+        updates.statuses = view.filters.statuses.join(',');
+      } else {
+        updates.statuses = null;
+      }
+
+      if (view.filters.actor) {
+        updates.actor = view.filters.actor;
+      } else {
+        updates.actor = null;
+      }
+
+      if (view.filters.resourceType) {
+        updates.resourceType = view.filters.resourceType;
+      } else {
+        updates.resourceType = null;
+      }
+
+      if (view.filters.resourceId) {
+        updates.resourceId = view.filters.resourceId;
+      } else {
+        updates.resourceId = null;
+      }
+
+      if (view.filters.ip) {
+        updates.ip = view.filters.ip;
+      } else {
+        updates.ip = null;
+      }
+
+      updateSearchParams(updates);
+    } catch (err: any) {
+      console.error('Failed to load view:', err);
+      setError(err.message || 'Failed to load view');
+    }
+  };
+
+  const handleDeleteView = async (id: string) => {
+    try {
+      await deleteSavedView(id);
+      // Reload saved views
+      const views = await getSavedViews();
+      setSavedViews(views);
+    } catch (err: any) {
+      console.error('Failed to delete view:', err);
+      setError(err.message || 'Failed to delete view');
+    }
+  };
+
   // Calculate stats
   const totalEvents = logs.length;
   const activeUsers = new Set(logs.map(log => log.actorId)).size;
@@ -390,27 +552,38 @@ export default function AuditLogsPage() {
             Immutable record of all system activity
           </p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="h-8 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
-            >
-              <Download className="h-4 w-4" />
-              Export
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleExport('json')}>
-              Export as JSON
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('csv')}>
-              Export as CSV
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+            onClick={() => setSavedViewsDialogOpen(true)}
+          >
+            <Save className="h-4 w-4" />
+            Saved Views
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="h-8 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+              >
+                <Download className="h-4 w-4" />
+                Export
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport('json')}>
+                Export as JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                Export as CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Filter Bar - Exact Figma Layout */}
@@ -1081,6 +1254,18 @@ export default function AuditLogsPage() {
           </SheetContent>
         </Sheet>
       </TooltipProvider>
+
+      {/* Saved Views Dialog */}
+      <SavedViewsDialog
+        open={savedViewsDialogOpen}
+        onOpenChange={setSavedViewsDialogOpen}
+        savedViews={savedViews}
+        currentFilters={getCurrentFilters()}
+        onSaveView={handleSaveView}
+        onLoadView={handleLoadView}
+        onDeleteView={handleDeleteView}
+        isSaving={isSavingView}
+      />
     </div>
   );
 }

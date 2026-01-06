@@ -5,6 +5,7 @@ import { UserEntity } from './user.entity';
 import { ApiKeyEntity } from './api-key.entity';
 import { AuditEventEntity } from './audit-event.entity';
 import { WebhookEntity } from './webhook.entity';
+import { SavedViewEntity } from './saved-view.entity';
 
 @Entity({ name: 'organizations' })
 export class OrganizationEntity extends BaseEntity {
@@ -33,5 +34,10 @@ export class OrganizationEntity extends BaseEntity {
     cascade: true,
   })
   webhooks: Relation<WebhookEntity[]>;
+
+  @OneToMany(() => SavedViewEntity, (savedView) => savedView.organization, {
+    cascade: true,
+  })
+  savedViews: Relation<SavedViewEntity[]>;
 }
 

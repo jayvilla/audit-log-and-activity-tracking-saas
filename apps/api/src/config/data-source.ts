@@ -9,6 +9,7 @@ import {
   AuditEventEntity,
   WebhookEntity,
   WebhookDeliveryEntity,
+  SavedViewEntity,
 } from '../entities';
 
 // Load environment variables from root .env file
@@ -37,6 +38,7 @@ export const dataSourceOptions: DataSourceOptions = {
     AuditEventEntity,
     WebhookEntity,
     WebhookDeliveryEntity,
+    SavedViewEntity,
   ],
   // Migrations path: supports both .ts (dev) and .js (prod builds)
   // Path is relative to apps/api/src (one level up from config/)

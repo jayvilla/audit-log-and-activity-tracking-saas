@@ -881,3 +881,202 @@ export async function getOrganization(): Promise<Organization> {
   return response.json();
 }
 
+/**
+ * Saved View types and functions
+ */
+export interface SavedView {
+  id: string;
+  name: string;
+  description?: string;
+  filters: {
+    search?: string;
+    dateRange?: string;
+    startDate?: string;
+    endDate?: string;
+    actors?: string[];
+    actions?: string[];
+    resources?: string[];
+    statuses?: string[];
+    actor?: string;
+    resourceType?: string;
+    resourceId?: string;
+    ip?: string;
+  };
+  created: string;
+  lastUsed: string | null;
+  useCount: number;
+}
+
+export interface CreateSavedViewRequest {
+  name: string;
+  description?: string;
+  filters: SavedView['filters'];
+}
+
+export interface UpdateSavedViewRequest {
+  name?: string;
+  description?: string;
+  filters?: SavedView['filters'];
+}
+
+/**
+ * Get all saved views for the current organization
+ */
+export async function getSavedViews(): Promise<SavedView[]> {
+  const response = await fetch(`${API_URL}/v1/saved-views`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch saved views');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a saved view by ID
+ */
+export async function getSavedView(id: string): Promise<SavedView> {
+  const response = await fetch(`${API_URL}/v1/saved-views/${id}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('Saved view not found');
+    }
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch saved view');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new saved view
+ */
+export async function createSavedView(
+  request: CreateSavedViewRequest,
+): Promise<SavedView> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/saved-views`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to create saved view' }));
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error(error.message || 'Failed to create saved view');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update a saved view
+ */
+export async function updateSavedView(
+  id: string,
+  request: UpdateSavedViewRequest,
+): Promise<SavedView> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/saved-views/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to update saved view' }));
+    if (response.status === 404) {
+      throw new Error('Saved view not found');
+    }
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error(error.message || 'Failed to update saved view');
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a saved view
+ */
+export async function deleteSavedView(id: string): Promise<void> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/saved-views/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to delete saved view' }));
+    if (response.status === 404) {
+      throw new Error('Saved view not found');
+    }
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error(error.message || 'Failed to delete saved view');
+  }
+}
+
+/**
+ * Record that a saved view was used
+ */
+export async function recordSavedViewUsage(id: string): Promise<SavedView> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/saved-views/${id}/use`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to record usage' }));
+    if (response.status === 404) {
+      throw new Error('Saved view not found');
+    }
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error(error.message || 'Failed to record usage');
+  }
+
+  return response.json();
+}
+

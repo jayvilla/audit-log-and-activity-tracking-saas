@@ -10,6 +10,7 @@ import { AuditEventsModule } from './audit-events/audit-events.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { UsersModule } from './users/users.module';
 import { OrgsModule } from './orgs/orgs.module';
+import { SavedViewsModule } from './saved-views/saved-views.module';
 import { CsrfGuard } from './auth/csrf.guard';
 import {
   OrganizationEntity,
@@ -18,6 +19,7 @@ import {
   AuditEventEntity,
   WebhookEntity,
   WebhookDeliveryEntity,
+  SavedViewEntity,
 } from '../entities';
 
 @Module({
@@ -42,6 +44,7 @@ import {
           AuditEventEntity,
           WebhookEntity,
           WebhookDeliveryEntity,
+          SavedViewEntity,
         ],
         synchronize: false, // Never use synchronize in production
         logging: configService.get<string>('NODE_ENV') === 'development',
@@ -59,6 +62,7 @@ import {
       AuditEventEntity,
       WebhookEntity,
       WebhookDeliveryEntity,
+      SavedViewEntity,
     ]),
     AuthModule,
     ApiKeyModule,
@@ -66,6 +70,7 @@ import {
     WebhooksModule,
     UsersModule,
     OrgsModule,
+    SavedViewsModule,
   ],
   controllers: [AppController],
   providers: [
