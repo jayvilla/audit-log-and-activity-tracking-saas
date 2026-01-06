@@ -70,6 +70,7 @@ import {
   Info,
   Lock,
   Save,
+  Sparkles,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -109,6 +110,7 @@ export default function AuditLogsPage() {
   const [isSavingView, setIsSavingView] = useState(false);
   
   // AI Summary state
+  const [showAISummary, setShowAISummary] = useState(false);
   const [aiSummary, setAiSummary] = useState<AISummaryData | null>(null);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState(false);
@@ -179,9 +181,11 @@ export default function AuditLogsPage() {
   // Load AI Summary
   useEffect(() => {
     async function loadAISummary() {
-      // Don't load if there are no events or if we're still loading the main data
-      if (isLoading || logs.length === 0) {
-        setAiSummary(null);
+      // Don't load if AI summary is hidden, no events, or still loading the main data
+      if (!showAISummary || isLoading || logs.length === 0) {
+        if (!showAISummary) {
+          setAiSummary(null);
+        }
         return;
       }
 
@@ -224,7 +228,7 @@ export default function AuditLogsPage() {
     // Debounce AI summary loading slightly to avoid too many requests
     const timeoutId = setTimeout(loadAISummary, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, dateRange, startDate, endDate, actions.join(','), statuses.join(','), actorFilter, resourceTypeFilter, resourceIdFilter, ipFilter, logs.length, isLoading]);
+  }, [showAISummary, searchQuery, dateRange, startDate, endDate, actions.join(','), statuses.join(','), actorFilter, resourceTypeFilter, resourceIdFilter, ipFilter, logs.length, isLoading]);
 
   // Extract unique values for filters
   const uniqueActions = useMemo(() => {
@@ -621,6 +625,17 @@ export default function AuditLogsPage() {
             <Save className="h-4 w-4" />
             Saved Views
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 gap-2 bg-bg border border-border rounded-lg px-2.5 text-sm text-fg hover:bg-bg-ui-30"
+            onClick={() => {
+              setShowAISummary(!showAISummary);
+            }}
+          >
+            <Sparkles className="h-4 w-4" />
+            {showAISummary ? 'Hide AI Summary' : 'AI Summary'}
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -918,29 +933,31 @@ export default function AuditLogsPage() {
       </div>
 
       {/* AI Summary Panel */}
-      <AISummaryPanel
-        data={aiSummary || undefined}
-        loading={aiSummaryLoading}
-        error={aiSummaryError}
-        isEmpty={!aiSummaryLoading && !aiSummaryError && !aiSummaryDisabled && logs.length === 0}
-        isDisabled={aiSummaryDisabled}
-        onGenerate={() => {
-          // Trigger reload by updating a dependency
-          setAiSummaryLoading(true);
-          setTimeout(() => {
-            // This will trigger the useEffect to reload
-            setAiSummaryError(false);
-          }, 100);
-        }}
-        onViewSourceEvents={(eventIds) => {
-          // Scroll to table and highlight events if IDs provided
-          // For now, just scroll to table
-          const tableElement = document.querySelector('[data-audit-table]');
-          if (tableElement) {
+      {showAISummary && (
+        <AISummaryPanel
+          data={aiSummary || undefined}
+          loading={aiSummaryLoading}
+          error={aiSummaryError}
+          isEmpty={!aiSummaryLoading && !aiSummaryError && !aiSummaryDisabled && logs.length === 0}
+          isDisabled={aiSummaryDisabled}
+          onGenerate={() => {
+            // Trigger reload by updating a dependency
+            setAiSummaryLoading(true);
+            setTimeout(() => {
+              // This will trigger the useEffect to reload
+              setAiSummaryError(false);
+            }, 100);
+          }}
+          onViewSourceEvents={(eventIds) => {
+            // Scroll to table and highlight events if IDs provided
+            // For now, just scroll to table
+            const tableElement = document.querySelector('[data-audit-table]');
+            if (tableElement) {
             tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         }}
-      />
+        />
+      )}
 
       {/* Table - Exact Figma Layout with Expandable Rows */}
       <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl overflow-hidden" data-audit-table>
