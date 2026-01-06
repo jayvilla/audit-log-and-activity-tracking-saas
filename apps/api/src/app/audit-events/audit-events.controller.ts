@@ -23,6 +23,7 @@ import { AuditEventsService } from './audit-events.service';
 import { DemoSeedingService } from './demo-seeding.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
+import { GetAnalyticsDto } from './dto/get-analytics.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '../../entities/user.entity';
@@ -290,6 +291,40 @@ export class AuditEventsController {
     );
 
     return metrics;
+  }
+
+  @Get('analytics')
+  @UseGuards(AuthGuard, UserRateLimitGuard)
+  @RateLimit('auditQuery')
+  @ApiOperation({ summary: 'Get analytics data for analytics page' })
+  @ApiOkResponse({
+    description: 'Analytics data retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getAnalytics(
+    @Query() query: GetAnalyticsDto,
+    @Req() req: Request,
+  ) {
+    const orgId = req.session.orgId;
+    const userId = req.session.userId;
+    const role = req.session.role;
+
+    if (!orgId || !userId || !role) {
+      throw new UnauthorizedException('Session data missing');
+    }
+
+    // Get user email for demo data filtering
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    return this.auditEventsService.getAnalytics(
+      orgId,
+      userId,
+      role,
+      query,
+      user?.email,
+    );
   }
 }
 

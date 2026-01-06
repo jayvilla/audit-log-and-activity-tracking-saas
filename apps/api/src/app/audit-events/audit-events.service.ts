@@ -3,8 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { AuditEventEntity, ActorType } from '../../entities/audit-event.entity';
 import { UserEntity } from '../../entities/user.entity';
+import { ApiKeyEntity } from '../../entities/api-key.entity';
 import type { CreateAuditEventRequest } from '@audit-log-and-activity-tracking-saas/types';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
+import { GetAnalyticsDto } from './dto/get-analytics.dto';
 import { Readable } from 'stream';
 import { WebhooksService } from '../webhooks/webhooks.service';
 
@@ -20,6 +22,8 @@ export class AuditEventsService {
     private readonly auditEventRepository: Repository<AuditEventEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+    @InjectRepository(ApiKeyEntity)
+    private readonly apiKeyRepository: Repository<ApiKeyEntity>,
     @Inject(forwardRef(() => WebhooksService))
     private readonly webhooksService: WebhooksService,
   ) {}
@@ -687,6 +691,262 @@ export class AuditEventsService {
       eventActivityLast7Days,
       topActions,
       recentActivity,
+    };
+  }
+
+  /**
+   * Get analytics data for the analytics page
+   * Returns time series, action distribution, and actor volume data
+   */
+  async getAnalytics(
+    orgId: string,
+    userId: string,
+    userRole: string,
+    query: GetAnalyticsDto,
+    userEmail?: string,
+  ): Promise<{
+    eventsPerDay: Array<{
+      date: string;
+      fullDate: string;
+      total: number;
+      success: number;
+      failure: number;
+    }>;
+    actionsByType: Array<{
+      action: string;
+      count: number;
+      percentage: number;
+    }>;
+    actorsByVolume: Array<{
+      actor: string;
+      count: number;
+      type: 'user' | 'api_key' | 'system';
+    }>;
+    summary: {
+      totalEvents: number;
+      totalFailures: number;
+      failureRate: number;
+      avgEventsPerDay: number;
+      trend: number;
+    };
+  }> {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Determine date range
+    let days: number;
+    let startDate: Date;
+    
+    if (query.timeRange === '7d') {
+      days = 7;
+      startDate = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+    } else if (query.timeRange === '30d') {
+      days = 30;
+      startDate = new Date(todayStart.getTime() - 29 * 24 * 60 * 60 * 1000);
+    } else if (query.timeRange === '90d') {
+      days = 90;
+      startDate = new Date(todayStart.getTime() - 89 * 24 * 60 * 60 * 1000);
+    } else if (query.timeRange === '1y') {
+      days = 365;
+      startDate = new Date(todayStart.getTime() - 364 * 24 * 60 * 60 * 1000);
+    } else if (query.startDate && query.endDate) {
+      startDate = new Date(query.startDate);
+      const endDate = new Date(query.endDate);
+      days = Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    } else {
+      // Default to 30 days
+      days = 30;
+      startDate = new Date(todayStart.getTime() - 29 * 24 * 60 * 60 * 1000);
+    }
+    
+    const endDate = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000); // End of today
+
+    // DEMO: Exclude demo data unless user is admin@example.com
+    const excludeDemo = userEmail !== 'admin@example.com';
+
+    // Build base query with RBAC
+    const baseQuery = this.auditEventRepository
+      .createQueryBuilder('audit_event')
+      .where('audit_event.orgId = :orgId', { orgId })
+      .andWhere('audit_event.createdAt >= :startDate', { startDate })
+      .andWhere('audit_event.createdAt < :endDate', { endDate });
+
+    if (userRole !== 'admin') {
+      baseQuery
+        .andWhere('audit_event.actorType = :actorType', { actorType: ActorType.USER })
+        .andWhere('audit_event.actorId = :userId', { userId });
+    }
+
+    // DEMO: Filter out demo data unless user is admin@example.com
+    if (excludeDemo) {
+      baseQuery.andWhere(
+        "(audit_event.metadata->>'demo' IS NULL OR audit_event.metadata->>'demo' != 'true')",
+      );
+    }
+
+    // Events per day with success/failure breakdown
+    const eventsPerDayQuery = baseQuery
+      .clone()
+      .select("DATE_TRUNC('day', audit_event.createdAt)", 'date')
+      .addSelect('COUNT(*)', 'total')
+      .addSelect(
+        "COUNT(*) FILTER (WHERE audit_event.metadata->>'status' = 'failure')",
+        'failure'
+      )
+      .addSelect(
+        "COUNT(*) FILTER (WHERE audit_event.metadata->>'status' != 'failure' OR audit_event.metadata->>'status' IS NULL)",
+        'success'
+      )
+      .groupBy("DATE_TRUNC('day', audit_event.createdAt)")
+      .orderBy("DATE_TRUNC('day', audit_event.createdAt)", 'ASC');
+
+    const eventsPerDayResults = await eventsPerDayQuery.getRawMany<{
+      date: Date;
+      total: string;
+      success: string;
+      failure: string;
+    }>();
+
+    // Fill in missing days with 0
+    const eventsPerDay: Array<{
+      date: string;
+      fullDate: string;
+      total: number;
+      success: number;
+      failure: number;
+    }> = [];
+    
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const fullDate = date.toISOString().split('T')[0];
+      const result = eventsPerDayResults.find(
+        (r) => new Date(r.date).toDateString() === date.toDateString(),
+      );
+      eventsPerDay.push({
+        date: dateStr,
+        fullDate,
+        total: result ? parseInt(result.total, 10) : 0,
+        success: result ? parseInt(result.success, 10) : 0,
+        failure: result ? parseInt(result.failure, 10) : 0,
+      });
+    }
+
+    // Actions by type
+    const actionsByTypeQuery = baseQuery
+      .clone()
+      .select('audit_event.action', 'action')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('audit_event.action')
+      .orderBy('COUNT(*)', 'DESC')
+      .limit(20);
+
+    const actionsByTypeResults = await actionsByTypeQuery.getRawMany<{
+      action: string;
+      count: string;
+    }>();
+
+    const totalEventsForPercentage = eventsPerDay.reduce((sum, day) => sum + day.total, 0);
+    const actionsByType = actionsByTypeResults.map((r) => ({
+      action: r.action,
+      count: parseInt(r.count, 10),
+      percentage: totalEventsForPercentage > 0
+        ? Math.round((parseInt(r.count, 10) / totalEventsForPercentage) * 100)
+        : 0,
+    }));
+
+    // Actors by volume
+    const actorsByVolumeQuery = baseQuery
+      .clone()
+      .select('audit_event.actorType', 'actorType')
+      .addSelect('audit_event.actorId', 'actorId')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('audit_event.actorType')
+      .addGroupBy('audit_event.actorId')
+      .orderBy('COUNT(*)', 'DESC')
+      .limit(50);
+
+    const actorsByVolumeResults = await actorsByVolumeQuery.getRawMany<{
+      actorType: string;
+      actorId: string;
+      count: string;
+    }>();
+
+    // Resolve actor names
+    const userActorIds = actorsByVolumeResults
+      .filter((r) => r.actorType === ActorType.USER && r.actorId)
+      .map((r) => r.actorId);
+    const apiKeyActorIds = actorsByVolumeResults
+      .filter((r) => r.actorType === ActorType.API_KEY && r.actorId)
+      .map((r) => r.actorId);
+
+    const users = userActorIds.length > 0
+      ? await this.userRepository.find({ where: { id: In(userActorIds) } }).catch(() => [])
+      : [];
+    const apiKeys = apiKeyActorIds.length > 0
+      ? await this.apiKeyRepository.find({ where: { id: In(apiKeyActorIds) } }).catch(() => [])
+      : [];
+
+    const userMap = new Map(users.map((u) => [u.id, u.name || u.email]));
+    const apiKeyMap = new Map(apiKeys.map((k) => [k.id, k.name || k.keyPrefix || `api_key_${k.id.substring(0, 8)}`]));
+
+    const actorsByVolume = actorsByVolumeResults.map((r) => {
+      let actorName = 'Unknown';
+      if (r.actorType === ActorType.USER && r.actorId) {
+        actorName = userMap.get(r.actorId) || `user_${r.actorId.substring(0, 8)}`;
+      } else if (r.actorType === ActorType.API_KEY && r.actorId) {
+        actorName = apiKeyMap.get(r.actorId) || `api_key_${r.actorId.substring(0, 8)}`;
+      } else if (r.actorType === ActorType.SYSTEM) {
+        actorName = 'system';
+      }
+
+      const actorType: 'user' | 'api_key' | 'system' = 
+        r.actorType === ActorType.USER ? 'user' : r.actorType === ActorType.API_KEY ? 'api_key' : 'system';
+
+      return {
+        actor: actorName,
+        count: parseInt(r.count, 10),
+        type: actorType,
+      };
+    });
+
+    // Calculate summary stats
+    const totalEvents = eventsPerDay.reduce((sum, day) => sum + day.total, 0);
+    const totalFailures = eventsPerDay.reduce((sum, day) => sum + day.failure, 0);
+    const failureRate = totalEvents > 0 ? (totalFailures / totalEvents) * 100 : 0;
+    const avgEventsPerDay = Math.round(totalEvents / days);
+
+    // Calculate 7-day trend (compare last 7 days to previous 7 days)
+    let trend = 0;
+    if (eventsPerDay.length >= 14) {
+      const recent7Days = eventsPerDay.slice(-7).reduce((sum, d) => sum + d.total, 0);
+      const previous7Days = eventsPerDay.slice(-14, -7).reduce((sum, d) => sum + d.total, 0);
+      if (previous7Days > 0) {
+        trend = ((recent7Days - previous7Days) / previous7Days) * 100;
+      } else if (recent7Days > 0) {
+        trend = 100;
+      }
+    } else if (eventsPerDay.length >= 7) {
+      const recent7Days = eventsPerDay.slice(-7).reduce((sum, d) => sum + d.total, 0);
+      const previousDays = eventsPerDay.slice(0, Math.min(7, eventsPerDay.length - 7)).reduce((sum, d) => sum + d.total, 0);
+      if (previousDays > 0) {
+        trend = ((recent7Days - previousDays) / previousDays) * 100;
+      } else if (recent7Days > 0) {
+        trend = 100;
+      }
+    }
+
+    return {
+      eventsPerDay,
+      actionsByType,
+      actorsByVolume,
+      summary: {
+        totalEvents,
+        totalFailures,
+        failureRate: parseFloat(failureRate.toFixed(2)),
+        avgEventsPerDay,
+        trend: parseFloat(trend.toFixed(1)),
+      },
     };
   }
 }

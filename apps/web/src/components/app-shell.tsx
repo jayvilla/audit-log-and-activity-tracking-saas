@@ -22,6 +22,7 @@ import {
   Menu,
   Search,
   ChevronDown,
+  BarChart3,
 } from 'lucide-react';
 
 interface User {
@@ -48,6 +49,7 @@ type NavigationItem = {
 const allNavigationItems: NavigationItem[] = [
   { name: 'Overview', href: '/overview', icon: LayoutDashboard, roles: ['admin', 'member', 'viewer'] },
   { name: 'Audit Logs', href: '/audit-logs', icon: FileText, roles: ['admin', 'member', 'viewer'] },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'member', 'viewer'] },
   { name: 'API Keys', href: '/api-keys', icon: Key, roles: ['admin'] },
   { name: 'Webhooks', href: '/webhooks', icon: Webhook, roles: ['admin'] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin', 'member', 'viewer'] },

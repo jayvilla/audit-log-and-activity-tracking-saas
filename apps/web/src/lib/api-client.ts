@@ -471,6 +471,58 @@ export async function getOverviewMetrics(): Promise<OverviewMetrics> {
 }
 
 /**
+ * Analytics types and functions
+ */
+export type AnalyticsTimeRange = '7d' | '30d' | '90d' | '1y';
+
+export interface AnalyticsData {
+  eventsPerDay: Array<{
+    date: string;
+    fullDate: string;
+    total: number;
+    success: number;
+    failure: number;
+  }>;
+  actionsByType: Array<{
+    action: string;
+    count: number;
+    percentage: number;
+  }>;
+  actorsByVolume: Array<{
+    actor: string;
+    count: number;
+    type: 'user' | 'api_key' | 'system';
+  }>;
+  summary: {
+    totalEvents: number;
+    totalFailures: number;
+    failureRate: number;
+    avgEventsPerDay: number;
+    trend: number;
+  };
+}
+
+/**
+ * Get analytics data for the analytics page
+ */
+export async function getAnalytics(timeRange: AnalyticsTimeRange = '30d'): Promise<AnalyticsData> {
+  const queryParams = new URLSearchParams();
+  queryParams.append('timeRange', timeRange);
+
+  const response = await fetch(`${API_URL}/v1/audit-events/analytics?${queryParams.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch analytics data');
+  }
+
+  return response.json();
+}
+
+/**
  * Webhook types and functions
  */
 export interface Webhook {
