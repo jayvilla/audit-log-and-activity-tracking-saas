@@ -1303,5 +1303,555 @@ Guidelines:
       throw new Error(`Failed to generate AI summary: ${errorMessage}`);
     }
   }
+
+  /**
+   * Investigate related events using AI correlation and timeline reconstruction
+   * Read-only investigation that groups related events and reconstructs timelines
+   */
+  async investigate(
+    orgId: string,
+    userId: string,
+    userRole: string,
+    context: {
+      eventId?: string;
+      patternId?: string;
+      actorEmail?: string;
+      action?: string;
+      timeRange?: { startDate?: string; endDate?: string };
+      filters?: {
+        actions?: string[];
+        statuses?: string[];
+        actor?: string;
+        resourceType?: string;
+        resourceId?: string;
+        ip?: string;
+        search?: string;
+      };
+      focus?: 'correlation' | 'timeline' | 'both';
+    },
+    userEmail?: string,
+  ): Promise<{
+    summary: string;
+    triggerContext: string;
+    correlationGroups?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      relevanceScore: number;
+      eventCount: number;
+      timeSpan: string;
+      events: Array<{
+        id: string;
+        timestamp: string;
+        actor: string;
+        actorType: string;
+        action: string;
+        status: string;
+        resourceType: string;
+        resourceId: string;
+        whyRelevant: string;
+        sourceCitations: string[];
+      }>;
+      whyCorrelated: string;
+      citations: string[];
+    }>;
+    timeline?: Array<{
+      id: string;
+      timestamp: string;
+      actor: string;
+      actorType: string;
+      action: string;
+      status: string;
+      resourceType: string;
+      resourceId: string;
+      significance: 'critical' | 'important' | 'normal';
+      explanation: string;
+      relatedEventIds: string[];
+    }>;
+    keyFindings?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      severity: 'high' | 'medium' | 'low';
+      eventCount: number;
+      citations: string[];
+    }>;
+    provenance: {
+      timeRange: string;
+      filters: string[];
+      totalEventsAnalyzed: number;
+      correlationModel: string;
+      sourceEventIds: string[];
+    };
+  }> {
+    try {
+      // Check if LLM is enabled (allow admin override for dev)
+      const isAdminOverride = userEmail === 'admin@example.com';
+      if (!this.llmService.isEnabled() && !isAdminOverride) {
+        throw new ServiceUnavailableException('AI-guided investigation is not available for your account. Contact your administrator to enable this feature.');
+      }
+
+      // Build query to retrieve events based on context
+      const excludeDemo = userEmail !== 'admin@example.com';
+      
+      // Determine time range
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+      
+      if (context.timeRange?.startDate) {
+        startDate = new Date(context.timeRange.startDate);
+      }
+      if (context.timeRange?.endDate) {
+        endDate = new Date(context.timeRange.endDate);
+      }
+      
+      // If eventId is provided, get that event and use its timestamp to set time range
+      let triggerEvent: AuditEventEntity | null = null;
+      if (context.eventId) {
+        triggerEvent = await this.auditEventRepository.findOne({
+          where: { id: context.eventId, orgId },
+        });
+        
+        if (!triggerEvent) {
+          throw new ForbiddenException('Event not found or access denied');
+        }
+        
+        // Set time range to 24 hours around the event if not specified
+        if (!startDate && !endDate) {
+          const eventTime = triggerEvent.createdAt;
+          startDate = new Date(eventTime.getTime() - 12 * 60 * 60 * 1000); // 12 hours before
+          endDate = new Date(eventTime.getTime() + 12 * 60 * 60 * 1000); // 12 hours after
+        }
+      } else if (!startDate && !endDate) {
+        // Default to last 7 days if no time range specified
+        endDate = new Date();
+        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      }
+
+      // Build query similar to getAuditEvents
+      const queryBuilder = this.buildFilteredQuery(
+        orgId,
+        userId,
+        userRole,
+        {
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+          action: context.filters?.actions,
+          status: context.filters?.statuses,
+          actorId: context.filters?.actor || context.actorEmail,
+          resourceType: context.filters?.resourceType,
+          resourceId: context.filters?.resourceId,
+          ipAddress: context.filters?.ip,
+          metadataText: context.filters?.search,
+        } as GetAuditEventsDto,
+        excludeDemo,
+        userEmail,
+      );
+
+      // If specific action is provided, filter by it
+      if (context.action) {
+        queryBuilder.andWhere('audit_event.action = :action', { action: context.action });
+      }
+
+      // Limit to reasonable number of events for analysis (max 500)
+      queryBuilder.limit(500);
+      queryBuilder.orderBy('audit_event.createdAt', 'DESC');
+
+      const events = await queryBuilder.getMany();
+
+      if (events.length === 0) {
+        return {
+          summary: 'No related events found for this investigation.',
+          triggerContext: context.eventId 
+            ? `Investigating: Event ${context.eventId}`
+            : 'Investigating: Current filters and time range',
+          correlationGroups: [],
+          timeline: [],
+          keyFindings: [],
+          provenance: {
+            timeRange: formatTimeRange(startDate, endDate),
+            filters: formatFilters(context.filters || {}),
+            totalEventsAnalyzed: 0,
+            correlationModel: 'Pattern-v2.1',
+            sourceEventIds: [],
+          },
+        };
+      }
+
+      // Redact events before sending to LLM
+      const redactedEvents = redactAuditEvents(events);
+
+      // Build trigger context string
+      let triggerContext = 'Investigating: ';
+      if (context.eventId && triggerEvent) {
+        const actorEmail = triggerEvent.metadata?.actorEmail || triggerEvent.actorId || 'unknown';
+        triggerContext += `Event ${context.eventId} from ${actorEmail}`;
+      } else if (context.actorEmail) {
+        triggerContext += `Events from ${context.actorEmail}`;
+      } else if (context.action) {
+        triggerContext += `Events with action ${context.action}`;
+      } else {
+        triggerContext += 'Current filters and time range';
+      }
+
+      // Determine focus (default to both)
+      const focus = context.focus || 'both';
+      const needsCorrelation = focus === 'correlation' || focus === 'both';
+      const needsTimeline = focus === 'timeline' || focus === 'both';
+
+      // Prepare LLM prompt
+      const systemPrompt = `You are an audit log analysis assistant. Your role is to analyze audit events and identify correlations and reconstruct timelines. 
+
+CRITICAL RULES:
+- You MUST only describe what happened (past tense). Never predict, speculate, or recommend actions.
+- You MUST ground all claims in the provided event data.
+- You MUST cite specific event IDs for every claim.
+- You MUST explain why events are correlated (shared resources, time windows, IP addresses, actors, etc.).
+- You MUST explain why each event is relevant to the investigation.
+- Never claim certainty ("this is definitely...") or make security assessments ("this is an attack").
+- Use calm, factual language. No hype or marketing language.`;
+
+      const eventsJson = JSON.stringify(redactedEvents, null, 2);
+      const timeRangeStr = formatTimeRange(startDate, endDate);
+      const filtersStr = formatFilters(context.filters || {}).join(', ') || 'None';
+
+      const userPrompt = `Analyze the following audit events and ${needsCorrelation ? 'identify correlation groups' : ''}${needsCorrelation && needsTimeline ? ' and ' : ''}${needsTimeline ? 'reconstruct a timeline' : ''}.
+
+Time Range: ${timeRangeStr}
+Filters: ${filtersStr}
+Total Events: ${events.length}
+
+Events (redacted, no secrets):
+${eventsJson}
+
+${needsCorrelation ? `
+CORRELATION GROUPS:
+Group related events that share:
+- Same resource (resourceType + resourceId)
+- Same actor (actorId)
+- Same IP address (if available in metadata)
+- Overlapping time windows (within 10-15 minutes)
+- Sequential patterns (e.g., login → access → update)
+
+For each correlation group, provide:
+- Title: Brief descriptive title
+- Description: One-sentence summary
+- Relevance Score: 0-100% confidence that events are meaningfully related
+- Why Correlated: Factual explanation (e.g., "These events share the same resource (doc_12345) and occurred within a 10-minute window from the same IP address")
+- Citations: List of event IDs used to determine correlation (not just the events in the group, but events that support the correlation logic)
+- Events: List of events in the group with "why relevant" explanations for each
+` : ''}
+
+${needsTimeline ? `
+TIMELINE RECONSTRUCTION:
+Order events chronologically and explain the significance of each event in the sequence.
+
+For each timeline event, provide:
+- Significance: "critical" (failures, privilege changes), "important" (precursors/outcomes), or "normal" (context)
+- Explanation: Factual description of significance (e.g., "This login established the session used for subsequent document access")
+- Related Event IDs: List of event IDs that are temporally or causally related
+` : ''}
+
+KEY FINDINGS:
+Identify notable patterns or sequences:
+- Failed authentication attempts
+- Elevated privilege changes
+- Unusual access patterns
+- Sequential resource access
+
+For each finding, provide:
+- Title: Brief descriptive title
+- Description: 2-3 sentence factual summary
+- Severity: "high" (security concerns), "medium" (operational concerns), "low" (informational)
+- Event Count: Number of events contributing
+- Citations: List of supporting event IDs
+
+Provide your analysis in the following JSON format:
+{
+  "summary": "A concise 2-3 paragraph summary of the investigation findings. Calm, factual tone. Past tense only.",
+  ${needsCorrelation ? `"correlationGroups": [
+    {
+      "id": "group_1",
+      "title": "Correlation group title",
+      "description": "One-sentence summary",
+      "relevanceScore": 85,
+      "eventCount": 3,
+      "timeSpan": "2:15 PM - 2:25 PM (10 minutes)",
+      "whyCorrelated": "Factual explanation of correlation logic",
+      "citations": ["evt_1a2b", "evt_2b3c"],
+      "events": [
+        {
+          "id": "evt_1a2b",
+          "timestamp": "2025-12-31T14:15:00Z",
+          "actor": "sarah@acme.com",
+          "actorType": "user",
+          "action": "user.login",
+          "status": "success",
+          "resourceType": "authentication",
+          "resourceId": "auth_98765",
+          "whyRelevant": "Factual explanation with source citations",
+          "sourceCitations": ["evt_1a2b", "evt_2b3c"]
+        }
+      ]
+    }
+  ],` : ''}
+  ${needsTimeline ? `"timeline": [
+    {
+      "id": "evt_1a2b",
+      "timestamp": "2025-12-31T14:15:00Z",
+      "actor": "sarah@acme.com",
+      "actorType": "user",
+      "action": "user.login",
+      "status": "success",
+      "resourceType": "authentication",
+      "resourceId": "auth_98765",
+      "significance": "important",
+      "explanation": "Factual description of significance",
+      "relatedEventIds": ["evt_2b3c", "evt_3c4d"]
+    }
+  ],` : ''}
+  "keyFindings": [
+    {
+      "id": "finding_1",
+      "title": "Finding title",
+      "description": "2-3 sentence factual summary",
+      "severity": "high",
+      "eventCount": 3,
+      "citations": ["evt_4d5e", "evt_5e6f"]
+    }
+  ]
+}
+
+Guidelines:
+- Only include correlation groups if you observe clear relationships (2+ events)
+- Only include timeline events if they have meaningful significance
+- Only include key findings if you observe notable patterns
+- Relevance scores should reflect actual correlation strength (not just temporal proximity)
+- All explanations must be factual and grounded in the data
+- Use event IDs from the provided events list`;
+
+      const llmResponse = await this.llmService.generate({
+        model: 'llama3',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        maxTokens: 4000,
+        jsonSchema: {
+          type: 'object',
+          properties: {
+            summary: { type: 'string' },
+            ...(needsCorrelation ? {
+              correlationGroups: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    title: { type: 'string' },
+                    description: { type: 'string' },
+                    relevanceScore: { type: 'number' },
+                    eventCount: { type: 'number' },
+                    timeSpan: { type: 'string' },
+                    whyCorrelated: { type: 'string' },
+                    citations: { type: 'array', items: { type: 'string' } },
+                    events: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          timestamp: { type: 'string' },
+                          actor: { type: 'string' },
+                          actorType: { type: 'string' },
+                          action: { type: 'string' },
+                          status: { type: 'string' },
+                          resourceType: { type: 'string' },
+                          resourceId: { type: 'string' },
+                          whyRelevant: { type: 'string' },
+                          sourceCitations: { type: 'array', items: { type: 'string' } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            } : {}),
+            ...(needsTimeline ? {
+              timeline: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    timestamp: { type: 'string' },
+                    actor: { type: 'string' },
+                    actorType: { type: 'string' },
+                    action: { type: 'string' },
+                    status: { type: 'string' },
+                    resourceType: { type: 'string' },
+                    resourceId: { type: 'string' },
+                    significance: { type: 'string', enum: ['critical', 'important', 'normal'] },
+                    explanation: { type: 'string' },
+                    relatedEventIds: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            } : {}),
+            keyFindings: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  title: { type: 'string' },
+                  description: { type: 'string' },
+                  severity: { type: 'string', enum: ['high', 'medium', 'low'] },
+                  eventCount: { type: 'number' },
+                  citations: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+      }, isAdminOverride);
+
+      // Parse JSON response
+      let aiData: {
+        summary: string;
+        correlationGroups?: Array<{
+          id: string;
+          title: string;
+          description: string;
+          relevanceScore: number;
+          eventCount: number;
+          timeSpan: string;
+          whyCorrelated: string;
+          citations: string[];
+          events: Array<{
+            id: string;
+            timestamp: string;
+            actor: string;
+            actorType: string;
+            action: string;
+            status: string;
+            resourceType: string;
+            resourceId: string;
+            whyRelevant: string;
+            sourceCitations: string[];
+          }>;
+        }>;
+        timeline?: Array<{
+          id: string;
+          timestamp: string;
+          actor: string;
+          actorType: string;
+          action: string;
+          status: string;
+          resourceType: string;
+          resourceId: string;
+          significance: 'critical' | 'important' | 'normal';
+          explanation: string;
+          relatedEventIds: string[];
+        }>;
+        keyFindings?: Array<{
+          id: string;
+          title: string;
+          description: string;
+          severity: 'high' | 'medium' | 'low';
+          eventCount: number;
+          citations: string[];
+        }>;
+      };
+
+      if (llmResponse.json) {
+        aiData = llmResponse.json as typeof aiData;
+      } else {
+        // Fallback: try to parse text response
+        let textToParse = llmResponse.text.trim();
+        
+        if (textToParse.startsWith('```')) {
+          const codeBlockMatch = textToParse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (codeBlockMatch) {
+            textToParse = codeBlockMatch[1].trim();
+          }
+        }
+        
+        const jsonMatch = textToParse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          textToParse = jsonMatch[0];
+        }
+        
+        try {
+          aiData = JSON.parse(textToParse);
+        } catch (parseError) {
+          this.logger.warn('Failed to parse LLM investigation response', {
+            error: parseError instanceof Error ? parseError.message : 'Unknown error',
+          });
+          aiData = {
+            summary: llmResponse.text || 'Investigation completed, but structured results could not be parsed.',
+            correlationGroups: [],
+            timeline: [],
+            keyFindings: [],
+          };
+        }
+      }
+
+      // Ensure summary exists
+      if (!aiData.summary) {
+        aiData.summary = 'Investigation completed, but no summary was provided.';
+      }
+
+      // Collect all source event IDs
+      const sourceEventIds = new Set<string>();
+      events.forEach(e => sourceEventIds.add(e.id));
+      if (aiData.correlationGroups) {
+        aiData.correlationGroups.forEach(group => {
+          group.events.forEach(e => sourceEventIds.add(e.id));
+          group.citations.forEach(id => sourceEventIds.add(id));
+        });
+      }
+      if (aiData.timeline) {
+        aiData.timeline.forEach(item => {
+          sourceEventIds.add(item.id);
+          item.relatedEventIds.forEach(id => sourceEventIds.add(id));
+        });
+      }
+      if (aiData.keyFindings) {
+        aiData.keyFindings.forEach(finding => {
+          finding.citations.forEach(id => sourceEventIds.add(id));
+        });
+      }
+
+      return {
+        summary: aiData.summary,
+        triggerContext,
+        correlationGroups: aiData.correlationGroups || [],
+        timeline: aiData.timeline || [],
+        keyFindings: aiData.keyFindings || [],
+        provenance: {
+          timeRange: timeRangeStr,
+          filters: formatFilters(context.filters || {}),
+          totalEventsAnalyzed: events.length,
+          correlationModel: 'Pattern-v2.1',
+          sourceEventIds: Array.from(sourceEventIds).slice(0, 200), // Limit to 200 IDs
+        },
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('not available') || errorMessage.includes('unavailable')) {
+        throw new ServiceUnavailableException('The AI correlation model is temporarily unavailable. The audit log data is still accessible. Please try again later.');
+      }
+      
+      this.logger.error(`Investigation failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      throw new Error(`Failed to complete investigation: ${errorMessage}`);
+    }
+  }
 }
 

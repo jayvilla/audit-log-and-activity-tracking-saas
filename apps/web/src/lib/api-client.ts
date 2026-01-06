@@ -513,6 +513,124 @@ export async function getAISummary(
 }
 
 /**
+ * AI Investigation Types
+ */
+export interface InvestigationContext {
+  eventId?: string;
+  patternId?: string;
+  actorEmail?: string;
+  action?: string;
+  timeRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
+  filters?: {
+    actions?: string[];
+    statuses?: string[];
+    actor?: string;
+    resourceType?: string;
+    resourceId?: string;
+    ip?: string;
+    search?: string;
+  };
+  focus?: 'correlation' | 'timeline' | 'both';
+}
+
+export interface InvestigationResponse {
+  summary: string;
+  triggerContext: string;
+  correlationGroups?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    relevanceScore: number;
+    eventCount: number;
+    timeSpan: string;
+    events: Array<{
+      id: string;
+      timestamp: string;
+      actor: string;
+      actorType: string;
+      action: string;
+      status: string;
+      resourceType: string;
+      resourceId: string;
+      whyRelevant: string;
+      sourceCitations: string[];
+    }>;
+    whyCorrelated: string;
+    citations: string[];
+  }>;
+  timeline?: Array<{
+    id: string;
+    timestamp: string;
+    actor: string;
+    actorType: string;
+    action: string;
+    status: string;
+    resourceType: string;
+    resourceId: string;
+    significance: 'critical' | 'important' | 'normal';
+    explanation: string;
+    relatedEventIds: string[];
+  }>;
+  keyFindings?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    severity: 'high' | 'medium' | 'low';
+    eventCount: number;
+    citations: string[];
+  }>;
+  provenance: {
+    timeRange: string;
+    filters: string[];
+    totalEventsAnalyzed: number;
+    correlationModel: string;
+    sourceEventIds: string[];
+  };
+}
+
+/**
+ * Investigate related events using AI correlation and timeline reconstruction
+ * 
+ * This is a read-only endpoint that uses AI to identify correlations between events
+ * and reconstruct timelines. The investigation is feature-gated and disabled by default.
+ * 
+ * @param context - Investigation context (eventId, filters, timeRange, focus)
+ * @returns AI-generated investigation with correlations, timeline, and provenance
+ */
+export async function investigate(
+  context: InvestigationContext
+): Promise<InvestigationResponse> {
+  // Get CSRF token for POST request
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/audit-events/investigate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    credentials: 'include',
+    body: JSON.stringify({ context }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('AI features are disabled for your account');
+    }
+    if (response.status === 503) {
+      throw new Error('The AI correlation model is temporarily unavailable. The audit log data is still accessible. Please try again later.');
+    }
+    const error = await response.json().catch(() => ({ message: 'Failed to complete investigation' }));
+    throw new Error(error.message || 'Failed to complete investigation');
+  }
+
+  return response.json();
+}
+
+/**
  * Overview metrics types
  */
 export interface OverviewMetrics {

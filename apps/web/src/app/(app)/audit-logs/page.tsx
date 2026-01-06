@@ -15,10 +15,13 @@ import {
   type SavedView,
   getAISummary,
   type AISummaryResponse,
+  investigate,
+  type InvestigationResponse,
 } from '../../../lib/api-client';
 import { usePageTitle } from '../../../lib/use-page-title';
 import { SavedViewsDialog, type SavedViewFilters } from '../../../components/saved-views-dialog';
 import { AISummaryPanel, type AISummaryData } from '../../../components/ai-summary-panel';
+import { AIInvestigation, type InvestigationData } from '../../../components/ai-investigation';
 import {
   Button,
   Input,
@@ -115,6 +118,19 @@ export default function AuditLogsPage() {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState(false);
   const [aiSummaryDisabled, setAiSummaryDisabled] = useState(false);
+
+  // AI Investigation state
+  const [showInvestigation, setShowInvestigation] = useState(false);
+  const [investigationData, setInvestigationData] = useState<InvestigationData | null>(null);
+  const [investigationLoading, setInvestigationLoading] = useState(false);
+  const [investigationError, setInvestigationError] = useState(false);
+  const [investigationDisabled, setInvestigationDisabled] = useState(false);
+  const [investigationModelUnavailable, setInvestigationModelUnavailable] = useState(false);
+  const [investigationContext, setInvestigationContext] = useState<{
+    eventId?: string;
+    actorEmail?: string;
+    action?: string;
+  } | null>(null);
 
   // Update URL params
   const updateSearchParams = (updates: Record<string, string | null>) => {
@@ -229,6 +245,57 @@ export default function AuditLogsPage() {
     const timeoutId = setTimeout(loadAISummary, 500);
     return () => clearTimeout(timeoutId);
   }, [showAISummary, searchQuery, dateRange, startDate, endDate, actions.join(','), statuses.join(','), actorFilter, resourceTypeFilter, resourceIdFilter, ipFilter, logs.length, isLoading]);
+
+  // Load AI Investigation
+  const loadInvestigation = async (context: {
+    eventId?: string;
+    actorEmail?: string;
+    action?: string;
+  }) => {
+    setShowInvestigation(true);
+    setInvestigationLoading(true);
+    setInvestigationError(false);
+    setInvestigationDisabled(false);
+    setInvestigationModelUnavailable(false);
+    setInvestigationContext(context);
+    setInvestigationData(null);
+
+    try {
+      const response = await investigate({
+        eventId: context.eventId,
+        actorEmail: context.actorEmail,
+        action: context.action,
+        timeRange: {
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+        },
+        filters: {
+          actions: actions.length > 0 ? actions : undefined,
+          statuses: statuses.length > 0 ? statuses : undefined,
+          actor: actorFilter || undefined,
+          resourceType: resourceTypeFilter || undefined,
+          resourceId: resourceIdFilter || undefined,
+          ip: ipFilter || undefined,
+          search: searchQuery || undefined,
+        },
+        focus: 'both',
+      });
+
+      setInvestigationData(response);
+    } catch (err: any) {
+      console.error('Failed to load investigation:', err);
+      
+      if (err.message?.includes('disabled')) {
+        setInvestigationDisabled(true);
+      } else if (err.message?.includes('unavailable')) {
+        setInvestigationModelUnavailable(true);
+      } else {
+        setInvestigationError(true);
+      }
+    } finally {
+      setInvestigationLoading(false);
+    }
+  };
 
   // Extract unique values for filters
   const uniqueActions = useMemo(() => {
@@ -959,6 +1026,43 @@ export default function AuditLogsPage() {
         />
       )}
 
+      {/* AI Investigation Panel */}
+      {showInvestigation && (
+        <AIInvestigation
+          data={investigationData || undefined}
+          loading={investigationLoading}
+          error={investigationError}
+          isEmpty={!investigationLoading && !investigationError && !investigationDisabled && !investigationModelUnavailable && investigationData && investigationData.correlationGroups?.length === 0 && investigationData.timeline?.length === 0}
+          isDisabled={investigationDisabled}
+          modelUnavailable={investigationModelUnavailable}
+          onClose={() => {
+            setShowInvestigation(false);
+            setInvestigationData(null);
+            setInvestigationContext(null);
+          }}
+          onRetry={() => {
+            if (investigationContext) {
+              loadInvestigation(investigationContext);
+            }
+          }}
+          onViewEvent={(eventId) => {
+            // Find and select the event
+            const event = logs.find(log => log.id === eventId);
+            if (event) {
+              setSelectedLog(event);
+            }
+          }}
+          onViewSourceEvents={(eventIds) => {
+            // Filter table to show only source events
+            // For now, just scroll to table
+            const tableElement = document.querySelector('[data-audit-table]');
+            if (tableElement) {
+              tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }}
+        />
+      )}
+
       {/* Table - Exact Figma Layout with Expandable Rows */}
       <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl overflow-hidden" data-audit-table>
         {isLoading ? (
@@ -1203,6 +1307,43 @@ export default function AuditLogsPage() {
                     </div>
                   </Card>
                 </div>
+
+                <div className="h-px bg-border" />
+
+                {/* AI-Guided Investigation */}
+                <Card variant="bordered" className="bg-purple-500/5 border-purple-500/20 rounded-xl p-[17px]">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-purple-500/10 shrink-0">
+                      <Sparkles className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-fg">AI-Guided Investigation</h3>
+                        <Badge variant="default" className="bg-purple-500/10 border-purple-500/20 text-purple-400">
+                          AI-guided
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-fg-muted">
+                        Analyze related events and reconstruct timelines to understand the context around this event.
+                      </p>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-8 gap-2 bg-purple-500 hover:bg-purple-600 text-white mt-2"
+                        onClick={() => {
+                          loadInvestigation({
+                            eventId: selectedLog.id,
+                            actorEmail: getActorEmail(selectedLog) || undefined,
+                            action: selectedLog.action,
+                          });
+                        }}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        Investigate Related Events
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
 
                 <div className="h-px bg-border" />
 

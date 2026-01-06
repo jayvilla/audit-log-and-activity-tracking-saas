@@ -25,6 +25,7 @@ import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
 import { GetAnalyticsDto } from './dto/get-analytics.dto';
 import { GetAISummaryDto } from './dto/get-ai-summary.dto';
+import { InvestigateDto } from './dto/investigate.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '../../entities/user.entity';
@@ -402,6 +403,129 @@ export class AuditEventsController {
       userId,
       role,
       query,
+      user?.email,
+    );
+  }
+
+  @Post('investigate')
+  @UseGuards(AuthGuard, UserRateLimitGuard)
+  @RateLimit('auditQuery')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Investigate related events using AI correlation and timeline reconstruction',
+    description: 'Read-only endpoint that uses AI to identify correlations between events and reconstruct timelines. Feature-gated and disabled by default.',
+  })
+  @ApiOkResponse({
+    description: 'Investigation completed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        triggerContext: { type: 'string' },
+        correlationGroups: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              relevanceScore: { type: 'number' },
+              eventCount: { type: 'number' },
+              timeSpan: { type: 'string' },
+              whyCorrelated: { type: 'string' },
+              citations: { type: 'array', items: { type: 'string' } },
+              events: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    timestamp: { type: 'string' },
+                    actor: { type: 'string' },
+                    actorType: { type: 'string' },
+                    action: { type: 'string' },
+                    status: { type: 'string' },
+                    resourceType: { type: 'string' },
+                    resourceId: { type: 'string' },
+                    whyRelevant: { type: 'string' },
+                    sourceCitations: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        timeline: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              timestamp: { type: 'string' },
+              actor: { type: 'string' },
+              actorType: { type: 'string' },
+              action: { type: 'string' },
+              status: { type: 'string' },
+              resourceType: { type: 'string' },
+              resourceId: { type: 'string' },
+              significance: { type: 'string', enum: ['critical', 'important', 'normal'] },
+              explanation: { type: 'string' },
+              relatedEventIds: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+        keyFindings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              severity: { type: 'string', enum: ['high', 'medium', 'low'] },
+              eventCount: { type: 'number' },
+              citations: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+        provenance: {
+          type: 'object',
+          properties: {
+            timeRange: { type: 'string' },
+            filters: { type: 'array', items: { type: 'string' } },
+            totalEventsAnalyzed: { type: 'number' },
+            correlationModel: { type: 'string' },
+            sourceEventIds: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    } as any,
+  })
+  @ApiResponse({ status: 403, description: 'AI features are disabled' })
+  @ApiResponse({ status: 503, description: 'AI service is unavailable' })
+  async investigate(
+    @Body() dto: InvestigateDto,
+    @Req() req: Request,
+  ) {
+    const orgId = req.session.orgId;
+    const userId = req.session.userId;
+    const role = req.session.role;
+
+    if (!orgId || !userId || !role) {
+      throw new UnauthorizedException('Session data missing');
+    }
+
+    // Get user email for demo data filtering and admin override
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    return this.auditEventsService.investigate(
+      orgId,
+      userId,
+      role,
+      dto.context,
       user?.email,
     );
   }
