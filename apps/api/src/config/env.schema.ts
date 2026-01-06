@@ -34,6 +34,11 @@ export const envSchema = z.object({
 
   // API Documentation (optional, enabled by default)
   DOCS_ENABLED: z.enum(['true', 'false']).optional().default('true'),
+
+  // LLM Configuration (DEV ONLY - optional, disabled by default)
+  LLM_ENABLED: z.enum(['true', 'false']).optional().default('false'),
+  LLM_OLLAMA_BASE_URL: z.string().url('LLM_OLLAMA_BASE_URL must be a valid URL').optional(),
+  LLM_DEFAULT_MODEL: z.string().min(1).optional().default('llama3'),
 });
 
 export type EnvSchema = z.infer<typeof envSchema>;

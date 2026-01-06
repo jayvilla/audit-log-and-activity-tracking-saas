@@ -24,6 +24,7 @@ import { DemoSeedingService } from './demo-seeding.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
 import { GetAnalyticsDto } from './dto/get-analytics.dto';
+import { GetAISummaryDto } from './dto/get-ai-summary.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '../../entities/user.entity';
@@ -319,6 +320,84 @@ export class AuditEventsController {
     });
 
     return this.auditEventsService.getAnalytics(
+      orgId,
+      userId,
+      role,
+      query,
+      user?.email,
+    );
+  }
+
+  @Post('ai-summary')
+  @UseGuards(AuthGuard, UserRateLimitGuard)
+  @RateLimit('auditQuery')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Generate AI summary for audit events',
+    description: 'Read-only endpoint that generates an AI-powered summary of audit events based on filters and time range. Feature-gated and disabled by default.',
+  })
+  @ApiOkResponse({
+    description: 'AI summary generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        patterns: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              eventCount: { type: 'number' },
+              severity: { type: 'string', enum: ['low', 'medium', 'high'] },
+            },
+          },
+        },
+        changes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              description: { type: 'string' },
+              eventCount: { type: 'number' },
+            },
+          },
+        },
+        provenance: {
+          type: 'object',
+          properties: {
+            timeRange: { type: 'string' },
+            filters: { type: 'array', items: { type: 'string' } },
+            totalEventsAnalyzed: { type: 'number' },
+            sourceEventIds: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 403, description: 'AI features are disabled' })
+  @ApiResponse({ status: 503, description: 'AI service is unavailable' })
+  async getAISummary(
+    @Body() query: GetAISummaryDto,
+    @Req() req: Request,
+  ) {
+    const orgId = req.session.orgId;
+    const userId = req.session.userId;
+    const role = req.session.role;
+
+    if (!orgId || !userId || !role) {
+      throw new UnauthorizedException('Session data missing');
+    }
+
+    // Get user email for demo data filtering and admin override
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    return this.auditEventsService.getAISummary(
       orgId,
       userId,
       role,

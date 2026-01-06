@@ -9,6 +9,7 @@ import { ApiKeyEntity } from '../../entities/api-key.entity';
 import { ApiKeyModule } from '../api-key/api-key.module';
 import { AuthModule } from '../auth/auth.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
     ApiKeyModule,
     AuthModule,
     WebhooksModule,
+    LLMModule,
   ],
   controllers: [AuditEventsController],
   providers: [AuditEventsService, DemoSeedingService],

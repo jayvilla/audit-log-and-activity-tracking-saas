@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, forwardRef, ForbiddenException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { AuditEventEntity, ActorType } from '../../entities/audit-event.entity';
@@ -7,8 +7,11 @@ import { ApiKeyEntity } from '../../entities/api-key.entity';
 import type { CreateAuditEventRequest } from '@audit-log-and-activity-tracking-saas/types';
 import { GetAuditEventsDto } from './dto/get-audit-events.dto';
 import { GetAnalyticsDto } from './dto/get-analytics.dto';
+import { GetAISummaryDto } from './dto/get-ai-summary.dto';
 import { Readable } from 'stream';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { LLMService } from '../llm/llm.service';
+import { redactAuditEvents, formatTimeRange, formatFilters } from '../llm/utils/data-redaction.util';
 
 interface Cursor {
   createdAt: string;
@@ -17,6 +20,8 @@ interface Cursor {
 
 @Injectable()
 export class AuditEventsService {
+  private readonly logger = new Logger(AuditEventsService.name);
+
   constructor(
     @InjectRepository(AuditEventEntity)
     private readonly auditEventRepository: Repository<AuditEventEntity>,
@@ -26,6 +31,7 @@ export class AuditEventsService {
     private readonly apiKeyRepository: Repository<ApiKeyEntity>,
     @Inject(forwardRef(() => WebhooksService))
     private readonly webhooksService: WebhooksService,
+    private readonly llmService: LLMService,
   ) {}
 
   async createAuditEvent(
@@ -948,6 +954,293 @@ export class AuditEventsService {
         trend: parseFloat(trend.toFixed(1)),
       },
     };
+  }
+
+  /**
+   * Generate AI summary for audit events
+   * 
+   * This is a read-only operation that analyzes audit events and generates
+   * an AI-powered summary. Data is redacted before sending to LLM.
+   */
+  async getAISummary(
+    orgId: string,
+    userId: string,
+    userRole: string,
+    query: GetAISummaryDto,
+    userEmail?: string,
+  ): Promise<{
+    summary: string;
+    patterns?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      eventCount: number;
+      severity?: 'low' | 'medium' | 'high';
+    }>;
+    changes?: Array<{
+      id: string;
+      description: string;
+      eventCount: number;
+    }>;
+    provenance: {
+      timeRange: string;
+      filters: string[];
+      totalEventsAnalyzed: number;
+      sourceEventIds?: string[];
+    };
+  }> {
+    // Check if LLM is enabled
+    // DEV ONLY: Allow admin@example.com to use AI features even if globally disabled
+    const normalizedEmail = userEmail?.toLowerCase().trim();
+    const isAdminOverride = normalizedEmail === 'admin@example.com';
+    const isLLMEnabled = this.llmService.isEnabled();
+    
+    this.logger.debug(`AI Summary check: email=${normalizedEmail}, isAdminOverride=${isAdminOverride}, isLLMEnabled=${isLLMEnabled}`);
+    
+    if (!isLLMEnabled && !isAdminOverride) {
+      this.logger.warn(`AI features disabled for user: ${normalizedEmail || 'unknown'}`);
+      throw new ForbiddenException('AI features are disabled');
+    }
+
+    // Convert AI summary DTO to GetAuditEventsDto for query building
+    const getEventsDto: GetAuditEventsDto = {
+      startDate: query.timeRange?.startDate,
+      endDate: query.timeRange?.endDate,
+      action: query.filters?.actions,
+      status: query.filters?.statuses,
+      actorId: query.filters?.actor,
+      resourceType: query.filters?.resourceType,
+      resourceId: query.filters?.resourceId,
+      ipAddress: query.filters?.ip,
+      metadataText: query.filters?.search,
+      limit: 1000, // Limit to 1000 events for AI analysis
+    };
+
+    // Build query and fetch events
+    const excludeDemo = userEmail !== 'admin@example.com';
+    const queryBuilder = this.buildFilteredQuery(orgId, userId, userRole, getEventsDto, excludeDemo, userEmail);
+    
+    // Limit to most recent events for analysis
+    queryBuilder.limit(1000);
+    
+    const events = await queryBuilder.getMany();
+
+    if (events.length === 0) {
+      return {
+        summary: 'No audit events found for the selected time range and filters.',
+        provenance: {
+          timeRange: formatTimeRange(
+            query.timeRange?.startDate ? new Date(query.timeRange.startDate) : undefined,
+            query.timeRange?.endDate ? new Date(query.timeRange.endDate) : undefined,
+          ),
+          filters: formatFilters(query.filters || {}),
+          totalEventsAnalyzed: 0,
+        },
+      };
+    }
+
+    // Redact sensitive data before sending to LLM
+    const redactedEvents = redactAuditEvents(events);
+
+    // Prepare prompt for LLM
+    const timeRangeStr = formatTimeRange(
+      query.timeRange?.startDate ? new Date(query.timeRange.startDate) : undefined,
+      query.timeRange?.endDate ? new Date(query.timeRange.endDate) : undefined,
+    );
+    const filtersStr = formatFilters(query.filters || {}).join('; ') || 'None';
+
+    // SIMPLE TEST PROMPT - Remove this and use the full prompt below once confirmed working
+    const systemPrompt = `You are an audit log analysis assistant. Provide a brief summary of audit events.`;
+
+    try {
+      // SIMPLE TEST: Just send a minimal prompt to verify LLM works
+      const eventCount = redactedEvents.length;
+      const userPrompt = `You have ${eventCount} audit events from ${timeRangeStr}${filtersStr ? ` with filters: ${filtersStr}` : ''}.
+
+Provide a brief 2-3 sentence summary of what happened. Format as JSON:
+{
+  "summary": "brief summary text here",
+  "patterns": [],
+  "changes": []
+}`;
+
+      // FULL PROMPT (uncomment once simple test works):
+      /*
+      const systemPrompt = `You are an audit log analysis assistant. Analyze the provided audit events and generate a concise summary. 
+      Focus on:
+      1. Overall activity patterns and trends
+      2. Notable security or operational events
+      3. Changes in behavior over time
+      4. Any anomalies or patterns worth highlighting
+
+      Be factual and grounded in the data. Do not invent events or details not present in the data.
+      If you're uncertain about something, state that clearly.`;
+
+      // Limit events sent to LLM to avoid timeout - use even smaller subset for faster processing
+      const eventsToSend = redactedEvents.slice(0, 50); // Limit to first 50 events for faster processing
+      const eventSummary = redactedEvents.length > 50 
+        ? `\n\nNote: Analyzing ${eventsToSend.length} of ${redactedEvents.length} total events.`
+        : '';
+      
+      // Create a more compact event summary instead of full JSON
+      const eventSummaryText = eventsToSend.map((e, i) => 
+        `${i + 1}. ${e.timestamp} - ${e.action} on ${e.resourceType}${e.resourceId ? ` (${e.resourceId})` : ''}${e.status ? ` - ${e.status}` : ''}`
+      ).join('\n');
+      
+      const userPrompt = `Analyze these ${eventsToSend.length} audit events${eventSummary}:
+
+      Time Range: ${timeRangeStr}
+      Filters: ${filtersStr}
+
+      Event Summary:
+      ${eventSummaryText}
+
+      Provide:
+      1. A concise summary (2-3 paragraphs) of the overall activity
+      2. Key patterns identified (if any) with event counts
+      3. Notable changes or trends (if any)
+
+      Format your response as JSON:
+      {
+        "summary": "string",
+        "patterns": [{"id": "string", "title": "string", "description": "string", "eventCount": number, "severity": "low|medium|high"}],
+        "changes": [{"id": "string", "description": "string", "eventCount": number}]
+      }`;
+      */
+
+      const llmResponse = await this.llmService.generate({
+        model: 'llama3',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        maxTokens: 2000,
+        jsonSchema: {
+          type: 'object',
+          properties: {
+            summary: { type: 'string' },
+            patterns: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  title: { type: 'string' },
+                  description: { type: 'string' },
+                  eventCount: { type: 'number' },
+                  severity: { type: 'string', enum: ['low', 'medium', 'high'] },
+                },
+              },
+            },
+            changes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  description: { type: 'string' },
+                  eventCount: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+      }, isAdminOverride);
+
+      // Parse JSON response
+      let aiData: {
+        summary: string;
+        patterns?: Array<{
+          id: string;
+          title: string;
+          description: string;
+          eventCount: number;
+          severity?: 'low' | 'medium' | 'high';
+        }>;
+        changes?: Array<{
+          id: string;
+          description: string;
+          eventCount: number;
+        }>;
+      };
+
+      if (llmResponse.json) {
+        aiData = llmResponse.json as typeof aiData;
+      } else {
+        // Fallback: try to parse text response
+        // LLM might return JSON wrapped in markdown code blocks or with extra text
+        let textToParse = llmResponse.text.trim();
+        
+        // Remove markdown code blocks if present
+        if (textToParse.startsWith('```')) {
+          const codeBlockMatch = textToParse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (codeBlockMatch) {
+            textToParse = codeBlockMatch[1].trim();
+          } else {
+            // Try to extract JSON from between backticks
+            const backtickMatch = textToParse.match(/```[\s\S]*?```/);
+            if (backtickMatch) {
+              textToParse = backtickMatch[0].replace(/```(?:json)?/g, '').replace(/```/g, '').trim();
+            }
+          }
+        }
+        
+        // Try to find JSON object in the text (in case there's extra text before/after)
+        const jsonMatch = textToParse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          textToParse = jsonMatch[0];
+        }
+        
+        try {
+          aiData = JSON.parse(textToParse);
+        } catch (parseError) {
+          this.logger.warn('Failed to parse LLM JSON response', {
+            error: parseError instanceof Error ? parseError.message : 'Unknown error',
+            textLength: llmResponse.text.length,
+            textPreview: llmResponse.text.substring(0, 200),
+          });
+          // If parsing fails, use text as summary
+          aiData = {
+            summary: llmResponse.text || 'Unable to generate structured summary.',
+          };
+        }
+      }
+
+      // Ensure summary exists
+      if (!aiData.summary) {
+        aiData.summary = 'Summary generation completed, but no summary text was provided.';
+      }
+
+      return {
+        summary: aiData.summary,
+        patterns: aiData.patterns?.filter((p) => p.title && p.description) || [],
+        changes: aiData.changes?.filter((c) => c.description) || [],
+        provenance: {
+          timeRange: timeRangeStr,
+          filters: formatFilters(query.filters || {}),
+          totalEventsAnalyzed: events.length,
+          sourceEventIds: events.slice(0, 100).map((e) => e.id), // Include first 100 IDs for reference
+        },
+      };
+    } catch (error) {
+      // Safe failure: return appropriate error based on error type
+      // If it's already a ServiceUnavailableException, re-throw it
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // If LLM provider is unavailable, return 503
+      if (errorMessage.includes('not available') || errorMessage.includes('unavailable')) {
+        throw new ServiceUnavailableException('AI service is currently unavailable. Please ensure Ollama is running and the model is available.');
+      }
+      
+      // For other errors, return 500 with error message
+      this.logger.error(`AI summary generation failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      throw new Error(`Failed to generate AI summary: ${errorMessage}`);
+    }
   }
 }
 

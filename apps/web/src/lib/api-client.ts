@@ -485,10 +485,14 @@ export interface AISummaryResponse {
 export async function getAISummary(
   request: AISummaryRequest
 ): Promise<AISummaryResponse> {
-  const response = await fetch(`${API_URL}/audit-events/ai-summary`, {
+  // Get CSRF token for POST request
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(`${API_URL}/v1/audit-events/ai-summary`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
     },
     credentials: 'include',
     body: JSON.stringify(request),

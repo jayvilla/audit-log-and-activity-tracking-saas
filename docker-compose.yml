@@ -43,6 +43,9 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-change-this-to-a-random-secret-in-production}
       # CORS Configuration - must match web origin
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      # LLM Configuration (DEV ONLY)
+      LLM_OLLAMA_BASE_URL: ${LLM_OLLAMA_BASE_URL:-http://ollama:11434}
+      LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-llama3}
     volumes:
       - .:/workspace
       - /workspace/node_modules

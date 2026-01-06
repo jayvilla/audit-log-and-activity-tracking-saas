@@ -13,9 +13,12 @@ import {
   deleteSavedView,
   recordSavedViewUsage,
   type SavedView,
+  getAISummary,
+  type AISummaryResponse,
 } from '../../../lib/api-client';
 import { usePageTitle } from '../../../lib/use-page-title';
 import { SavedViewsDialog, type SavedViewFilters } from '../../../components/saved-views-dialog';
+import { AISummaryPanel, type AISummaryData } from '../../../components/ai-summary-panel';
 import {
   Button,
   Input,
@@ -104,6 +107,12 @@ export default function AuditLogsPage() {
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [savedViewsDialogOpen, setSavedViewsDialogOpen] = useState(false);
   const [isSavingView, setIsSavingView] = useState(false);
+  
+  // AI Summary state
+  const [aiSummary, setAiSummary] = useState<AISummaryData | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState(false);
+  const [aiSummaryDisabled, setAiSummaryDisabled] = useState(false);
 
   // Update URL params
   const updateSearchParams = (updates: Record<string, string | null>) => {
@@ -166,6 +175,56 @@ export default function AuditLogsPage() {
 
     loadLogs();
   }, [searchQuery, dateRange, startDate, endDate, actions.join(','), statuses.join(','), actorFilter, resourceTypeFilter, resourceIdFilter, ipFilter]);
+
+  // Load AI Summary
+  useEffect(() => {
+    async function loadAISummary() {
+      // Don't load if there are no events or if we're still loading the main data
+      if (isLoading || logs.length === 0) {
+        setAiSummary(null);
+        return;
+      }
+
+      setAiSummaryLoading(true);
+      setAiSummaryError(false);
+      setAiSummaryDisabled(false);
+      
+      try {
+        const response = await getAISummary({
+          timeRange: {
+            startDate: startDate?.toISOString(),
+            endDate: endDate?.toISOString(),
+          },
+          filters: {
+            actions: actions.length > 0 ? actions : undefined,
+            statuses: statuses.length > 0 ? statuses : undefined,
+            actor: actorFilter || undefined,
+            resourceType: resourceTypeFilter || undefined,
+            resourceId: resourceIdFilter || undefined,
+            ip: ipFilter || undefined,
+            search: searchQuery || undefined,
+          },
+        });
+
+        setAiSummary(response);
+      } catch (err: any) {
+        console.error('Failed to load AI summary:', err);
+        
+        // Check if AI is disabled
+        if (err.message?.includes('disabled')) {
+          setAiSummaryDisabled(true);
+        } else {
+          setAiSummaryError(true);
+        }
+      } finally {
+        setAiSummaryLoading(false);
+      }
+    }
+
+    // Debounce AI summary loading slightly to avoid too many requests
+    const timeoutId = setTimeout(loadAISummary, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, dateRange, startDate, endDate, actions.join(','), statuses.join(','), actorFilter, resourceTypeFilter, resourceIdFilter, ipFilter, logs.length, isLoading]);
 
   // Extract unique values for filters
   const uniqueActions = useMemo(() => {
@@ -858,8 +917,33 @@ export default function AuditLogsPage() {
         </Card>
       </div>
 
+      {/* AI Summary Panel */}
+      <AISummaryPanel
+        data={aiSummary || undefined}
+        loading={aiSummaryLoading}
+        error={aiSummaryError}
+        isEmpty={!aiSummaryLoading && !aiSummaryError && !aiSummaryDisabled && logs.length === 0}
+        isDisabled={aiSummaryDisabled}
+        onGenerate={() => {
+          // Trigger reload by updating a dependency
+          setAiSummaryLoading(true);
+          setTimeout(() => {
+            // This will trigger the useEffect to reload
+            setAiSummaryError(false);
+          }, 100);
+        }}
+        onViewSourceEvents={(eventIds) => {
+          // Scroll to table and highlight events if IDs provided
+          // For now, just scroll to table
+          const tableElement = document.querySelector('[data-audit-table]');
+          if (tableElement) {
+            tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }}
+      />
+
       {/* Table - Exact Figma Layout with Expandable Rows */}
-      <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl overflow-hidden">
+      <Card variant="bordered" className="bg-[#18181b] border border-border rounded-xl overflow-hidden" data-audit-table>
         {isLoading ? (
           <div className="p-8 space-y-4">
             {[...Array(5)].map((_, i) => (
