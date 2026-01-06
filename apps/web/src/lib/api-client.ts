@@ -432,6 +432,83 @@ export async function revokeApiKey(id: string): Promise<void> {
 }
 
 /**
+ * AI Summary Types
+ */
+export interface AISummaryRequest {
+  timeRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
+  filters?: {
+    actions?: string[];
+    statuses?: string[];
+    actor?: string;
+    resourceType?: string;
+    resourceId?: string;
+    ip?: string;
+    search?: string;
+  };
+}
+
+export interface AISummaryResponse {
+  summary: string;
+  patterns?: {
+    id: string;
+    title: string;
+    description: string;
+    eventCount: number;
+    severity?: 'low' | 'medium' | 'high';
+  }[];
+  changes?: {
+    id: string;
+    description: string;
+    eventCount: number;
+  }[];
+  provenance: {
+    timeRange: string;
+    filters: string[];
+    totalEventsAnalyzed: number;
+    sourceEventIds?: string[];
+  };
+}
+
+/**
+ * Get AI summary for audit events
+ * 
+ * This is a read-only endpoint that generates an AI summary based on the current
+ * audit log filters and time range. The AI summary is feature-gated and disabled
+ * by default.
+ * 
+ * @param request - Time range and filters matching current audit log view
+ * @returns AI-generated summary with patterns, changes, and provenance
+ */
+export async function getAISummary(
+  request: AISummaryRequest
+): Promise<AISummaryResponse> {
+  const response = await fetch(`${API_URL}/audit-events/ai-summary`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('AI features are disabled for your account');
+    }
+    if (response.status === 503) {
+      throw new Error('AI service is currently unavailable');
+    }
+    const error = await response.json().catch(() => ({ message: 'Failed to generate AI summary' }));
+    throw new Error(error.message || 'Failed to generate AI summary');
+  }
+
+  return response.json();
+}
+
+/**
  * Overview metrics types
  */
 export interface OverviewMetrics {

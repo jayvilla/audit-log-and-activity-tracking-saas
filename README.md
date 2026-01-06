@@ -403,6 +403,44 @@ This starts:
 - Start all: `pnpm docker:all` or `docker-compose up -d`
 - Stop all: `pnpm docker:all:down` or `docker-compose down`
 
+### Ollama (LLM Service - DEV ONLY)
+
+**⚠️ WARNING:** Ollama is for local development only. AI features are disabled by default and must not be enabled in production without explicit configuration.
+
+**Start Ollama service:**
+```bash
+docker compose up -d ollama
+```
+
+**Pull llama3 model:**
+```bash
+docker compose exec ollama ollama pull llama3
+```
+
+**Verify Ollama is running:**
+```bash
+curl http://localhost:11434/api/tags
+```
+
+This should return a JSON response listing available models (including `llama3` if successfully pulled).
+
+**Environment Configuration:**
+
+Add to your `.env` file:
+```env
+# For container-to-container communication (when API runs in Docker)
+LLM_OLLAMA_BASE_URL=http://ollama:11434
+# For local development (when API runs outside Docker)
+# LLM_OLLAMA_BASE_URL=http://localhost:11434
+LLM_DEFAULT_MODEL=llama3
+```
+
+**Notes:**
+- Ollama service persists model data in a Docker volume (`ollama_data`)
+- Model downloads can be large (several GB for llama3)
+- AI features are feature-gated and disabled by default
+- See `docs/standards/env.md` for more details
+
 ---
 
 ## Testing

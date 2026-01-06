@@ -76,6 +76,23 @@ services:
     networks:
       - app-network
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: audit-log-saas-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-network
+
 volumes:
   db_data:
     driver: local
@@ -84,6 +101,8 @@ volumes:
   web_dist:
     driver: local
   web_next:
+    driver: local
+  ollama_data:
     driver: local
 
 networks:

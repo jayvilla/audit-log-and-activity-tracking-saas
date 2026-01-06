@@ -42,6 +42,8 @@ cp .env.example .env
 | `RATE_LIMIT_AUDIT_QUERY_MAX_REQUESTS` | Audit query limit | `60` | |
 | `RATE_LIMIT_API_KEY_MANAGEMENT_MAX_REQUESTS` | API key mgmt limit | `10` | |
 | `DOCS_ENABLED` | Enable API docs | `true` | `true` or `false` |
+| `LLM_OLLAMA_BASE_URL` | Ollama API base URL | (optional) | **DEV ONLY** - `http://ollama:11434` (Docker) or `http://localhost:11434` (local) |
+| `LLM_DEFAULT_MODEL` | Default LLM model name | `llama3` | **DEV ONLY** - Model to use for AI features |
 
 ### Production Requirements
 
@@ -101,6 +103,29 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | PostgreSQL password | `postgres` |
 | `POSTGRES_DB` | PostgreSQL database | `postgres` |
 | `DB_PORT` | Exposed DB port | `5432` |
+
+## LLM Configuration (DEV ONLY)
+
+**⚠️ WARNING:** LLM features are **DEV-ONLY** and must not be enabled in production unless explicitly configured.
+
+**Location:** Root `.env` or `apps/api/.env`
+
+| Variable | Description | Example | Notes |
+|----------|-------------|---------|-------|
+| `LLM_OLLAMA_BASE_URL` | Ollama API base URL | `http://ollama:11434` | Use `http://ollama:11434` when API runs in Docker, `http://localhost:11434` when running locally |
+| `LLM_DEFAULT_MODEL` | Default LLM model | `llama3` | Model name to use for AI features |
+
+**Setup Instructions:**
+
+1. Start Ollama service: `docker compose up -d ollama`
+2. Pull llama3 model: `docker compose exec ollama ollama pull llama3`
+3. Verify: `curl http://localhost:11434/api/tags` (should list available models)
+4. Configure API: Set `LLM_OLLAMA_BASE_URL` and `LLM_DEFAULT_MODEL` in `.env`
+
+**Production Safety:**
+- AI features are feature-gated and disabled by default
+- Never enable LLM in production without explicit configuration
+- Always use secure, production-grade LLM providers in production
 
 ## Environment-Specific Files
 
