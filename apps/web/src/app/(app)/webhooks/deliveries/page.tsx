@@ -24,6 +24,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
 } from '@audit-log-and-activity-tracking-saas/ui';
 import {
   Search,
@@ -39,6 +44,12 @@ import {
   Copy,
   ChevronRight,
   RotateCw,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Server,
+  Activity,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -85,6 +96,8 @@ export default function WebhookDeliveriesPage() {
     payload: boolean;
     response: boolean;
   }>({ payload: false, response: false });
+  const [copiedRequest, setCopiedRequest] = useState(false);
+  const [copiedResponse, setCopiedResponse] = useState(false);
 
   // Load webhooks for mapping
   useEffect(() => {
@@ -187,15 +200,31 @@ export default function WebhookDeliveriesPage() {
 
   const formatTimestamp = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayName = days[date.getDay()];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    const hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    const hourStr = hour12.toString().padStart(2, '0');
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tzAbbr = date.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
+    return `${dayName}, ${month} ${day}, ${year}, ${hourStr}:${minutes}:${seconds} ${ampm} ${tzAbbr}`;
+  };
+
+  const formatWebhookId = (webhookId: string) => {
+    // Extract short ID from UUID (first 8 chars after 'hook_')
+    return `hook_${webhookId.substring(0, 8)}`;
+  };
+
+  const formatDeliveryId = (deliveryId: string) => {
+    // Extract short ID from UUID (first 8 chars after 'del_')
+    return `del_${deliveryId.substring(0, 8)}`;
   };
 
   const formatLatency = (latency: number | null) => {
@@ -254,12 +283,32 @@ export default function WebhookDeliveriesPage() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopyRequest = () => {
+    if (selectedDelivery) {
+      navigator.clipboard.writeText(selectedDelivery.payload);
+      setCopiedRequest(true);
+      setTimeout(() => setCopiedRequest(false), 2000);
+    }
+  };
+
+  const handleCopyResponse = () => {
+    if (selectedDelivery) {
+      const content = selectedDelivery.response || selectedDelivery.error || '';
+      navigator.clipboard.writeText(content);
+      setCopiedResponse(true);
+      setTimeout(() => setCopiedResponse(false), 2000);
+    }
   };
 
   const toggleSection = (section: 'payload' | 'response') => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const getLatencyColor = (latency: number | null) => {
+    if (latency === null) return 'text-fg-muted';
+    if (latency < 200) return 'text-green-500';
+    if (latency < 1000) return 'text-orange-500';
+    return 'text-red-500';
   };
 
   if (isLoading) {
@@ -563,153 +612,390 @@ export default function WebhookDeliveriesPage() {
       </Card>
 
       {/* Delivery Details Drawer */}
-      <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          {selectedDelivery && (
-            <>
-              <SheetHeader>
-                <SheetTitle>Webhook Delivery Details</SheetTitle>
-                <SheetDescription>
-                  Complete information for this delivery attempt
-                </SheetDescription>
-              </SheetHeader>
+      <TooltipProvider>
+        <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-2xl bg-bg border-l border-border overflow-y-auto">
+            {selectedDelivery && (
+              <>
+                <SheetHeader className="pb-6">
+                  <SheetTitle className="text-base font-semibold text-fg">Webhook Delivery Details</SheetTitle>
+                  <SheetDescription className="text-sm text-fg-muted">
+                    Complete information for this delivery attempt
+                  </SheetDescription>
+                </SheetHeader>
 
-              <div className="space-y-6 py-6">
-                {/* Delivery Summary */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {selectedDelivery.eventType}
-                    </Badge>
-                    <span className="text-sm text-fg-muted">
-                      {formatTimestamp(selectedDelivery.attemptedAt)}
-                    </span>
-                    <div className="ml-auto">
-                      {getStatusBadge(selectedDelivery.status)}
+                <div className="space-y-6 py-6">
+                  {/* Delivery Summary */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-sm font-semibold text-fg">Delivery Summary</h3>
                     </div>
-                  </div>
-                </div>
+                    
+                    <Card variant="bordered" className="p-4 border-border space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <code className="text-base bg-accent px-3 py-1.5 rounded font-mono text-fg">
+                            {selectedDelivery.eventType}
+                          </code>
+                          <p className="text-sm text-fg-muted mt-2">
+                            {formatTimestamp(selectedDelivery.attemptedAt)}
+                          </p>
+                        </div>
+                        {getStatusBadge(selectedDelivery.status)}
+                      </div>
 
-                {/* Webhook & Endpoint */}
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap className="h-4 w-4 text-accent" />
-                      <span className="font-medium">{selectedDelivery.webhookName || 'Unknown Webhook'}</span>
-                    </div>
-                    <p className="text-xs text-fg-muted">hook_xyz789</p>
+                      {selectedDelivery.status === 'retrying' && selectedDelivery.nextRetryAt && (
+                        <div className="pt-3 border-t border-border">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Clock className="h-4 w-4 text-orange-500" />
+                            <span className="text-fg-muted">Next retry scheduled for:</span>
+                            <span className="font-mono text-orange-500">
+                              {new Date(selectedDelivery.nextRetryAt).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </Card>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Endpoint URL</label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={selectedDelivery.endpoint}
-                        readOnly
-                        className="font-mono text-sm"
-                      />
-                      <Button variant="ghost" size="icon" className="h-9 w-9">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Performance Metrics */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs text-fg-muted mb-1">Status Code</p>
-                    <p className={`text-sm font-medium ${selectedDelivery.statusCode === 200 ? 'text-green-500' : 'text-red-500'}`}>
-                      {selectedDelivery.statusCode || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-fg-muted mb-1">Latency</p>
-                    <div className="flex items-center gap-1">
-                      <p className="text-sm font-medium">{formatLatency(selectedDelivery.latency)}</p>
-                      <Zap className="h-3 w-3 text-green-500" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-fg-muted mb-1">Attempts</p>
-                    <p className="text-sm font-medium">{selectedDelivery.attempts}x</p>
-                  </div>
-                </div>
+                  <Separator />
 
-                {/* Request Payload */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Request Payload</label>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(selectedDelivery.payload)}
-                        className="h-7 gap-1"
-                      >
-                        <Copy className="h-3 w-3" />
-                        Copy
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleSection('payload')}
-                        className="h-7"
-                      >
-                        {expandedSections.payload ? 'Collapse' : 'Expand'}
-                      </Button>
+                  {/* Webhook & Endpoint Info */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-sm font-semibold text-fg">Webhook & Endpoint</h3>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-5 w-5">
+                            <Info className="h-3 w-3 text-fg-muted" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs">
+                          <p className="text-xs">
+                            The webhook configuration that triggered this delivery and the target endpoint URL.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
-                  </div>
-                  <div className={`border border-border rounded-lg bg-bg-card p-3 font-mono text-xs overflow-auto ${expandedSections.payload ? '' : 'max-h-32'}`}>
-                    <pre className="whitespace-pre-wrap">
-                      {JSON.stringify(JSON.parse(selectedDelivery.payload), null, 2)}
-                    </pre>
-                  </div>
-                </div>
 
-                {/* Response Body */}
-                {selectedDelivery.response && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">Response Body</label>
+                    <Card variant="bordered" className="p-4 border-border space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
+                          <Zap className="h-5 w-5 text-accent-fg" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-fg">{selectedDelivery.webhookName || 'Unknown Webhook'}</p>
+                          <p className="text-xs text-fg-muted font-mono mt-0.5">
+                            {formatWebhookId(selectedDelivery.webhookId)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div>
+                        <p className="text-xs text-fg-muted mb-1.5">Endpoint URL</p>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-accent px-2 py-1.5 rounded font-mono flex-1 break-all text-fg">
+                            {selectedDelivery.endpoint}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => window.open(selectedDelivery.endpoint, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <Separator />
+
+                  {/* Delivery Metrics */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-sm font-semibold text-fg">Performance Metrics</h3>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-5 w-5">
+                            <Info className="h-3 w-3 text-fg-muted" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs">
+                          <p className="text-xs">
+                            Performance data for this delivery attempt. Latency measures the time from request sent to response received.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    <Card variant="bordered" className="p-4 border-border">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-fg-muted mb-1">Status Code</p>
+                          <div className="flex items-center gap-2">
+                            {selectedDelivery.statusCode !== null ? (
+                              <code className={`text-sm font-mono font-semibold ${
+                                selectedDelivery.statusCode >= 200 && selectedDelivery.statusCode < 300
+                                  ? 'text-green-500'
+                                  : 'text-red-500'
+                              }`}>
+                                {selectedDelivery.statusCode}
+                              </code>
+                            ) : (
+                              <span className="text-sm text-fg-muted">N/A</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-fg-muted mb-1">Latency</p>
+                          <div className="flex items-center gap-2">
+                            {selectedDelivery.latency !== null ? (
+                              <>
+                                <Activity className={`h-4 w-4 ${getLatencyColor(selectedDelivery.latency)}`} />
+                                <span className={`text-sm font-mono font-semibold ${getLatencyColor(selectedDelivery.latency)}`}>
+                                  {formatLatency(selectedDelivery.latency)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-sm text-fg-muted">N/A</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-fg-muted mb-1">Attempts</p>
+                          <Badge variant="outline" className="font-mono">
+                            {selectedDelivery.attempts}x
+                          </Badge>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <Separator />
+
+                  {/* Request Payload */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-fg">Request Payload</h3>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5">
+                              <Info className="h-3 w-3 text-fg-muted" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p className="text-xs">
+                              The exact JSON payload that was sent to your webhook endpoint. This is read-only and cannot be modified.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(selectedDelivery.response || '')}
-                          className="h-7 gap-1"
+                          onClick={handleCopyRequest}
+                          className="gap-2 h-7"
                         >
-                          <Copy className="h-3 w-3" />
-                          Copy
+                          {copiedRequest ? (
+                            <>
+                              <CheckCircle className="h-3 w-3" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              Copy
+                            </>
+                          )}
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => toggleSection('response')}
-                          className="h-7"
+                          onClick={() => toggleSection('payload')}
+                          className="gap-2 h-7"
                         >
-                          {expandedSections.response ? 'Collapse' : 'Expand'}
+                          {expandedSections.payload ? (
+                            <>
+                              <ChevronDown className="h-3 w-3" />
+                              Collapse
+                            </>
+                          ) : (
+                            <>
+                              <ChevronRight className="h-3 w-3" />
+                              Expand
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
-                    <div className={`border border-border rounded-lg bg-bg-card p-3 font-mono text-xs overflow-auto ${expandedSections.response ? '' : 'max-h-32'}`}>
-                      <pre className="whitespace-pre-wrap">
-                        {JSON.stringify(JSON.parse(selectedDelivery.response), null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
 
-                {/* Delivery ID */}
-                <div className="pt-4 border-t border-border">
-                  <Badge variant="outline" className="text-xs">
-                    Delivery ID: {selectedDelivery.id}
-                  </Badge>
+                    {expandedSections.payload && (
+                      <Card variant="bordered" className="p-4 border-border bg-accent/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Server className="h-4 w-4 text-fg-muted" />
+                          <span className="text-xs font-medium text-fg-muted">POST Request Body</span>
+                        </div>
+                        <pre className="text-xs font-mono overflow-x-auto text-fg">
+                          <code>{(() => {
+                            try {
+                              return JSON.stringify(JSON.parse(selectedDelivery.payload), null, 2);
+                            } catch {
+                              return selectedDelivery.payload;
+                            }
+                          })()}</code>
+                        </pre>
+                      </Card>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Response / Error */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-fg">
+                          {selectedDelivery.status === 'success' ? 'Response Body' : 'Error Details'}
+                        </h3>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5">
+                              <Info className="h-3 w-3 text-fg-muted" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p className="text-xs">
+                              {selectedDelivery.status === 'success' 
+                                ? 'The response body returned by your webhook endpoint.'
+                                : 'Error information captured during the failed delivery attempt. Use this to debug and fix your endpoint.'}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(selectedDelivery.response || selectedDelivery.error) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCopyResponse}
+                            className="gap-2 h-7"
+                          >
+                            {copiedResponse ? (
+                              <>
+                                <CheckCircle className="h-3 w-3" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3 w-3" />
+                                Copy
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleSection('response')}
+                          className="gap-2 h-7"
+                        >
+                          {expandedSections.response ? (
+                            <>
+                              <ChevronDown className="h-3 w-3" />
+                              Collapse
+                            </>
+                          ) : (
+                            <>
+                              <ChevronRight className="h-3 w-3" />
+                              Expand
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {expandedSections.response && (
+                      <Card variant="bordered" className={`p-4 border-border ${
+                        selectedDelivery.status === 'success' ? 'bg-accent/30' : 'bg-red-500/5 border-red-500/20'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          {selectedDelivery.status === 'success' ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              <span className="text-xs font-medium text-green-500">Response ({selectedDelivery.statusCode})</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                              <span className="text-xs font-medium text-red-500">Error ({selectedDelivery.statusCode || 'N/A'})</span>
+                            </>
+                          )}
+                        </div>
+                        <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words text-fg">
+                          <code>{selectedDelivery.response || selectedDelivery.error || 'No response body'}</code>
+                        </pre>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Observability Notice */}
+                  {selectedDelivery.status === 'failed' && (
+                    <>
+                      <Separator />
+                      <Card variant="bordered" className="p-4 bg-blue-500/5 border-blue-500/20">
+                        <div className="flex gap-3">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 shrink-0">
+                                <Activity className="h-5 w-5 text-blue-500" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="text-xs">
+                                Failed deliveries are automatically retried with exponential backoff. You can also manually replay this delivery from the main table.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium text-blue-500">Debugging Tip</p>
+                            <p className="text-xs text-fg-muted">
+                              Review the error details above to identify the issue. Common causes: endpoint timeout, incorrect URL, authentication failure, or server errors. Fix your endpoint and use the Replay button to retry.
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    </>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="pt-4 border-t border-border flex items-center justify-between">
+                    <p className="text-xs text-fg-muted">
+                      Delivery ID: <code className="bg-accent px-1.5 py-0.5 rounded font-mono text-fg">{formatDeliveryId(selectedDelivery.id)}</code>
+                    </p>
+                    {selectedDelivery.status === 'failed' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleReplay(selectedDelivery.id)}
+                      >
+                        <RotateCw className="h-4 w-4" />
+                        Replay Delivery
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+      </TooltipProvider>
     </div>
   );
 }
