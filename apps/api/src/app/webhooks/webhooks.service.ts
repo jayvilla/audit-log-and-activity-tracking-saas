@@ -304,6 +304,169 @@ export class WebhooksService {
   }
 
   /**
+   * Get webhook deliveries with filters
+   */
+  async getWebhookDeliveries(
+    orgId: string,
+    params: {
+      webhookId?: string;
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+      eventType?: string;
+      endpoint?: string;
+      minLatency?: number;
+      maxLatency?: number;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<{
+    deliveries: Array<{
+      id: string;
+      webhookId: string;
+      webhookName?: string;
+      eventType: string;
+      endpoint: string;
+      status: 'success' | 'failed' | 'pending' | 'retrying';
+      statusCode: number | null;
+      latency: number | null;
+      attempts: number;
+      attemptedAt: string;
+      completedAt: string | null;
+      payload: string;
+      response: string | null;
+      error: string | null;
+    }>;
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const limit = Math.min(params.limit || 50, 100);
+    const offset = params.offset || 0;
+
+    // Build query - use inner join since webhook is required (nullable: false)
+    const queryBuilder = this.webhookDeliveryRepository
+      .createQueryBuilder('delivery')
+      .innerJoinAndSelect('delivery.webhook', 'webhook')
+      .where('webhook.orgId = :orgId', { orgId });
+
+    // Filter by webhook ID
+    if (params.webhookId) {
+      queryBuilder.andWhere('delivery.webhookId = :webhookId', { webhookId: params.webhookId });
+    }
+
+    // Filter by status
+    if (params.status) {
+      queryBuilder.andWhere('delivery.status = :status', { status: params.status });
+    }
+
+    // Filter by date range
+    if (params.startDate) {
+      queryBuilder.andWhere('delivery.attemptedAt >= :startDate', {
+        startDate: new Date(params.startDate),
+      });
+    }
+    if (params.endDate) {
+      queryBuilder.andWhere('delivery.attemptedAt <= :endDate', {
+        endDate: new Date(params.endDate),
+      });
+    }
+
+    // Apply pagination
+    queryBuilder.orderBy('delivery.attemptedAt', 'DESC').skip(offset).take(limit);
+
+    // Execute query
+    const deliveries = await queryBuilder.getMany();
+
+    // Map to DTO format
+    const deliveryDtos = deliveries.map((delivery) => {
+      // Parse payload to extract event type
+      let eventType = 'unknown';
+      try {
+        const payload = JSON.parse(delivery.payload);
+        eventType = payload.event || 'unknown';
+      } catch {
+        // If payload is not valid JSON, use 'unknown'
+      }
+
+      // Calculate latency (in milliseconds)
+      let latency: number | null = null;
+      if (delivery.completedAt && delivery.attemptedAt) {
+        latency = delivery.completedAt.getTime() - delivery.attemptedAt.getTime();
+      }
+
+      // Get webhook info
+      const webhook = delivery.webhook;
+      const endpoint = webhook?.url || 'unknown';
+
+      // Map status
+      let mappedStatus: 'success' | 'failed' | 'pending' | 'retrying' = 'pending';
+      if (delivery.status === 'success') {
+        mappedStatus = 'success';
+      } else if (delivery.status === 'failed') {
+        mappedStatus = 'failed';
+      } else if (delivery.status === 'retrying' || delivery.nextRetryAt) {
+        mappedStatus = 'retrying';
+      }
+
+      return {
+        id: delivery.id,
+        webhookId: delivery.webhookId,
+        webhookName: webhook?.name,
+        eventType,
+        endpoint,
+        status: mappedStatus,
+        statusCode: delivery.statusCode,
+        latency,
+        attempts: delivery.attempts,
+        attemptedAt: delivery.attemptedAt.toISOString(),
+        completedAt: delivery.completedAt?.toISOString() || null,
+        payload: delivery.payload,
+        response: delivery.response,
+        error: delivery.error,
+      };
+    });
+
+    // Apply additional filters that require payload parsing
+    let filteredDeliveries = deliveryDtos;
+
+    if (params.eventType) {
+      filteredDeliveries = filteredDeliveries.filter((d) =>
+        d.eventType.toLowerCase().includes(params.eventType!.toLowerCase()),
+      );
+    }
+
+    if (params.endpoint) {
+      filteredDeliveries = filteredDeliveries.filter((d) =>
+        d.endpoint.toLowerCase().includes(params.endpoint!.toLowerCase()),
+      );
+    }
+
+    if (params.minLatency !== undefined) {
+      filteredDeliveries = filteredDeliveries.filter(
+        (d) => d.latency !== null && d.latency >= params.minLatency!,
+      );
+    }
+
+    if (params.maxLatency !== undefined) {
+      filteredDeliveries = filteredDeliveries.filter(
+        (d) => d.latency !== null && d.latency <= params.maxLatency!,
+      );
+    }
+
+    // Calculate total count after all filtering (including in-memory filters)
+    // Note: This represents the total matching records after all filters are applied
+    const total = filteredDeliveries.length;
+
+    return {
+      deliveries: filteredDeliveries,
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  /**
    * Map entity to DTO format
    */
   toDto(webhook: WebhookEntity): {
